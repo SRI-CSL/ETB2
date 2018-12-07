@@ -1,0 +1,4 @@
+=> etcDatalogEngine (top level)
+	=> etbDatalog (collection and massaging of DL clauses)
+		=> termDatalogEngine (engine)
+	=> QueryOutput

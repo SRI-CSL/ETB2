@@ -1,0 +1,17 @@
+public static void sendFile(String filePath, DataOutputStream toServer) throws IOException {
+        File file = new File(filePath);
+        FileReader fileReader = new FileReader(file);
+        BufferedReader bufferedReader = new BufferedReader(fileReader);
+        StringBuffer stringBuffer = new StringBuffer();
+        String line;
+        while ((line = bufferedReader.readLine()) != null) {
+            stringBuffer.append(line);
+            stringBuffer.append("\n");
+            toServer.writeUTF(line);
+        }
+        toServer.writeUTF("EOF");
+        fileReader.close();
+        System.out.println("Contents of file:");
+        System.out.println(stringBuffer.toString());
+    }
+    
