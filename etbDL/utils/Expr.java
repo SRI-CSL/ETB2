@@ -19,6 +19,8 @@ public class Expr implements Indexable<String> {
     //public ArrayList<Integer> listPositions = new ArrayList();
     public boolean negated = false;
 
+    String signature, mode;
+    
     public Expr(String predicate, List<String> terms) {
         this.predicate = predicate;
         if(this.predicate.equals("!=")) { //convert to "<>" internally for simplicity
@@ -29,6 +31,16 @@ public class Expr implements Indexable<String> {
 
     public Expr(String predicate, String... terms) {
         this(predicate, Arrays.asList(terms));
+    }
+
+    public Expr(String predicate, List<String> terms, String signature, String mode) {
+        this.predicate = predicate;
+        if(this.predicate.equals("!=")) { //convert to "<>" internally for simplicity
+            this.predicate = "<>";
+        }
+        this.terms = terms;
+        this.signature = signature;
+        this.mode = mode;
     }
 
     public int arity() {
@@ -45,6 +57,22 @@ public class Expr implements Indexable<String> {
 
     public boolean isNegated() {
         return negated;
+    }
+
+    public String getMode() {
+        return this.mode;
+    }
+    
+    public String getSignature() {
+        return this.signature;
+    }
+    
+    public void setMode(String mode) {
+        this.mode = mode;
+    }
+    
+    public void setSignature(String signature) {
+        this.signature = signature;
     }
 
     //checks if the expression represents a supported built-in predicates (=, <>, <, <=, >, >=)
@@ -419,6 +447,12 @@ public class Expr implements Indexable<String> {
             sb.append(')');
         }
         return sb.toString();
+    }
+
+    public void print() {
+        System.out.println("--> expr : " + this.toString());
+        System.out.println("--> signature : " + this.signature);
+        System.out.println("--> mode : " + this.mode);
     }
 
     

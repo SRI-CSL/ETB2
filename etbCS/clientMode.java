@@ -48,7 +48,7 @@ public class clientMode {
             //sending service server for execution
             toServerData.writeUTF(serviceName); //service name
             //sending the mode -- to know if service is defined for the mode
-            String serviceInvMode = glueCodeAutoGen.getMode(serviceArgs);
+            String serviceInvMode = glueCodeAutoGen.getMode(serviceArgs); //TODO: move to utils **** from the glueCodeAutoGen
             toServerData.writeUTF(serviceInvMode);
             
             //sending service args to server
@@ -195,7 +195,9 @@ public class clientMode {
                         //TODO: a mixed list throws an exception
                         String eachFilePath = eachServiceArgLS.get(i).substring(5, eachServiceArgLS.get(i).length()-1);
                         System.out.println("\t\t\t -> file" + i + " : " + eachFilePath);
+                        System.out.println("\t\t\t -> repoDirPath : " + repoDirPath);
                         
+                        //if (utils.existsInRepo(eachFilePath, repoDirPath)) {
                         if (existsInRepo(eachFilePath)) {
                             System.out.println("\t\t\t\t -> file in client repo");
                             //sending file path and sha1
@@ -231,6 +233,8 @@ public class clientMode {
                 String filePath = eachServiceArg.substring(5, eachServiceArg.length()-1);
                 System.out.println("\t\t\t -> file : " + filePath);
                 toServerData.writeUTF("file");
+                
+                //if (utils.existsInRepo(filePath, repoDirPath)) {
                 if (existsInRepo(filePath)) {
                     System.out.println("file in client repo");
                     //sending file path and sha1

@@ -14,35 +14,45 @@ import java.io.*;
 import etb.etbCS.utils.*;
 import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
+import etb.etbDL.statements.etbDLParser;
 
 import etb.etbDL.utils.*;
 import etb.etbDL.services.*;
 import etb.etbDL.output.*;
 
-public class etcServer {
+public class etbNode {
     
     String hostIP = "127.0.0.1";
     int port = 0;
-    Map<String, serviceSpec> etcServices = new HashMap();
-    Map<String, serverSpec> servers = new HashMap();
-    ArrayList<String> serverIDs = new ArrayList(); //TODO: all in one
-    
-    String paramsFilePath = System.getProperty("user.dir") + "/params.json";
     String repoDirPath = System.getProperty("user.dir");
 
-    public etcServer() {
+    servicesPack services;
+    serversPackage serversPack;
+    workflowsPackage workflowsPack;
+    claimsPack claims;
+    
+    String paramsFilePath = System.getProperty("user.dir") + "/params.json";
+    
+    JSONObject nodeParamsJSONObj = new JSONObject();
+    
+    public etbNode() {
         try {
             this.hostIP = Inet4Address.getLocalHost().getHostAddress();
         } catch (UnknownHostException e) {
             System.out.println(e.getMessage());
             System.exit(1);
         }
+        
+        services = new servicesPack();
+        serversPack = new serversPackage();
+        workflowsPack = new workflowsPackage();
+        claims = new claimsPack();
     }
     
     private void initialise() {
         File paramsFile = new File(paramsFilePath);
         if (paramsFile.exists()){
-            System.out.println("--> server already initialised (use -h to see more options for updating server)");
+            System.out.println("--> \u001B[31m[warning]\u001B[30m initialised ETB node already exists at this location (use -h to see more options)");
         }
         else {
             while (true) {
@@ -56,7 +66,6 @@ public class etcServer {
                     System.out.println("\u001B[31m[error]\u001B[30m non-numeric port value not allowed");
                 }
             }
-            
             while (true) {
                 System.out.print("--> provide git repo : ");
                 Scanner in = new Scanner(System.in);
@@ -77,45 +86,34 @@ public class etcServer {
                     System.out.println("\u001B[31m[error]\u001B[30m please provide a valid path");
                 }
             }
-            
             save();
-            System.out.println("server initialised (use -h to see more options for adding more server components)");
+            System.out.println("ETB node initialised (use -h to see more options to update the node)");
         }
     }
 
-    public void populate() {
-
-        JSONObject serverParamsJSONObj = new JSONObject();
+    private void instantiate() {
         try {
             JSONParser parser = new JSONParser();
-            serverParamsJSONObj = (JSONObject) parser.parse(new FileReader(this.paramsFilePath));
+            nodeParamsJSONObj = (JSONObject) parser.parse(new FileReader(this.paramsFilePath));
         } catch (FileNotFoundException e) {
-            System.out.println("\u001B[31m[error]\u001B[30m server not yet initialised (use -init to initialise server)");
-             System.exit(0);
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (ParseException e) {
+            System.out.println("\u001B[31m[error]\u001B[30mno ETB node at this location (use -init to initialise an ETB node)");
+            System.exit(0);
+        } catch (IOException | ParseException e) {
             e.printStackTrace();
         }
         
-        this.port = Integer.valueOf(serverParamsJSONObj.get("port").toString());
-        this.repoDirPath = (String) serverParamsJSONObj.get("repoDirPath");
+        port = Integer.valueOf(nodeParamsJSONObj.get("port").toString());
+        repoDirPath = (String) nodeParamsJSONObj.get("repoDirPath");
         
-        JSONArray etcServicesJSON = (JSONArray) serverParamsJSONObj.get("services");
-        Iterator<JSONObject> iterator = etcServicesJSON.iterator();
-        while (iterator.hasNext()) {
-            JSONObject serviceSpecObj = (JSONObject) iterator.next();
-            String serviceName = (String) serviceSpecObj.get("name");
-            this.etcServices.put(serviceName, new serviceSpec(serviceSpecObj));
-        }
+    }
+
+    private void populate() {
         
-        JSONArray serversArrayJSON = (JSONArray) serverParamsJSONObj.get("servers");
-        Iterator<JSONObject> iterator2 = serversArrayJSON.iterator();
-        while (iterator2.hasNext()) {
-            serverSpec serv = new serverSpec(iterator2.next());
-            this.servers.put(serv.getID(), serv);
-            this.serverIDs.add(serv.getID());
-        }
+        services = new servicesPack((JSONArray) nodeParamsJSONObj.get("services"));
+        serversPack = new serversPackage((JSONArray) nodeParamsJSONObj.get("servers"));
+        workflowsPack = new workflowsPackage(repoDirPath, (JSONArray) nodeParamsJSONObj.get("workflows"));
+        claims = new claimsPack((JSONArray) nodeParamsJSONObj.get("claims"));
+        
     }
 
     public void run(String args[]) {
@@ -132,8 +130,7 @@ public class etcServer {
             else if (args[0].equals("-clean")) {
                 utils.runCMD0("rm -f etb/wrappers/* wrappers/*");
                 glueCodeAutoGen.updateExternPredBridgeFile();
-                this.etcServices = new HashMap();
-                this.servers = new HashMap();
+                instantiate();
                 save();
                 System.exit(1);
             }
@@ -142,21 +139,48 @@ public class etcServer {
                 System.exit(1);
             }
             else {
+                instantiate();
                 populate();
-                if (args[0].equals("-info")){
-                    printServerDetails();
+                if (args[0].equals("-node-info")){
+                    print();
                 }
+                else if (args[0].equals("-claims-status")){
+                    claims.checkStatus(workflowsPack.getWorkflows(), repoDirPath);
+                }
+                
+                else if (args[0].equals("-add-workflow")){
+                    workflowsPack.add();
+                    save();
+                }
+                else if (args[0].equals("-rm-workflow")){
+                    workflowsPack.remove();
+                    save();
+                }
+
+                else if (args[0].equals("-add-claim")){
+                    claims.add(workflowsPack.getWorkflows(), repoDirPath, this);
+                    save();
+                }
+                else if (args[0].equals("-rm-claim")){
+                    claims.remove();
+                    save();
+                }
+
                 else if (args[0].equals("-add-service")){
-                    addServices();
+                    services.add();
+                    save();
                 }
                 else if (args[0].equals("-rm-service")){
-                    removeServices();
+                    services.remove();
+                    save();
                 }
                 else if (args[0].equals("-add-server")){
-                    addServers();
+                    serversPack.add();
+                    save();
                 }
                 else if (args[0].equals("-rm-server")){
-                    removeServers();
+                    serversPack.remove();
+                    save();
                 }
                 else {
                     System.out.println("ERROR. Unknown option: " + args[0]);
@@ -185,8 +209,13 @@ public class etcServer {
                     etbDatalogEngine dlEngine = new etbDatalogEngine();
                     Collection<Map<String, String>> answers = dlEngine.run(this, dlPack);
                     
-                    if (answers != null) {
-                        System.out.println(dlPack.getGoal().toString());
+                    System.out.println(dlPack.getGoal().toString());
+                    if (answers == null) {
+                        System.out.println("=> no claim for the query (null binding found)");
+                    }
+                    else {
+                        //if (answers != null) {
+                        //System.out.println(dlPack.getGoal().toString());
                         QueryOutput qo = new DefaultQueryOutput();
                         qo.writeResult2(answers);
                     }
@@ -204,7 +233,19 @@ public class etcServer {
                 }
             }
             else if (args[0].equals("-set-repo")){
-                setRepo(args[1]);
+                setWorkingDirectory(args[1]);
+            }
+            else if (args[0].equals("-update-claim")){
+                claims.update(args[1], workflowsPack.getWorkflows(), repoDirPath, this);
+                save();
+            }
+            else if (args[0].equals("-upgrade-claim")){
+                claims.upgrade(args[1], workflowsPack.getWorkflows(), repoDirPath, this);
+                save();
+            }
+            else if (args[0].equals("-reconst-claim")){
+                claims.recreate(args[1], workflowsPack.getWorkflows(), repoDirPath, this);
+                save();
             }
             else {
                 System.out.println("ERROR. Unknown option: " + args[0]);
@@ -215,39 +256,15 @@ public class etcServer {
         }
     }
     
-    private void setRepo() {
-        while (true) {
-            System.out.print("--> provide git repo : ");
-            Scanner in = new Scanner(System.in);
-            this.repoDirPath = in.nextLine();
-            File repoDir = new File(repoDirPath);
-            if (repoDir.exists() && repoDir.isDirectory()){
-                try {
-                    File repoDirCan = new File(repoDir.getCanonicalPath());
-                    this.repoDirPath = repoDirCan.getAbsolutePath();
-                    break;
-                }
-                catch (IOException e) {
-                    System.out.println("\u001B[31m[error]\u001B[30m canonical path for file not found");
-                    System.out.println(e.getMessage());
-                }
-            }
-            else {
-                System.out.println("\u001B[31m[error]\u001B[30m please provide a valid path");
-            }
-        }
-    }
-
-    private boolean setRepo(String inDirPath) {
-        
+    private void setWorkingDirectory(String inDirPath) {
         File repoDir = new File(inDirPath);
         if (repoDir.exists() && repoDir.isDirectory()){
-            this.repoDirPath = inDirPath;
+            //this.repoDirPath = inDirPath;
             try {
-                File repoDirCan = new File(repoDir.getCanonicalPath());
-                this.repoDirPath = repoDirCan.getAbsolutePath();
+                File repoDirCanonical = new File(repoDir.getCanonicalPath());
+                this.repoDirPath = repoDirCanonical.getAbsolutePath();
                 save();
-                return true;
+                System.out.println("working directory successfully set");
             }
             catch (IOException e) {
                 System.out.println("\u001B[31m[error]\u001B[30m canonical path for file not found");
@@ -257,239 +274,52 @@ public class etcServer {
         else {
             System.out.println("\u001B[31m[error]\u001B[30m please provide a valid path");
         }
-        return false;
     }
 
     private void help() {
-        System.out.println("");
-        System.out.println("Overview:  ETB 2.0 - Evidential Tool Bus (Linux 64-bit version)\n");
+        System.out.println("\nOverview:  ETB 2.0 - Evidential Tool Bus (Linux 64-bit version)\n");
         System.out.println("Usage:     etb2 [options] <inputs>\n");
         System.out.println("Options: \n");
         System.out.println("-help/-h          shows this help menue");
-        System.out.println("-init             initialises the server at a given location");
-        System.out.println("-info             displays details of the server, like port, local services and available remote servers/services");
+        System.out.println("-init             initialises an etb node at a given location");
+        System.out.println("-info             displays details of the node, like its port, claims, workflows, local services and available remote servers/services");
         System.out.println("-clean            removes available local services and remote servers from the server");
+        System.out.println("-uninit           deletes initialisation componenets of the node");
         System.out.println("-set-port <int>   sets <int> as the port number of the server");
-        System.out.println("-set-port <dir>   sets <dir> as the git repo used for storing files");
+        System.out.println("-set-repo <dir>   sets <dir> as the git repo used as working directory");
         System.out.println("-query <term>     runs a query to get solutions for the given term");
         System.out.println("-script <file>    executes a file with datalog workflow to get solutions for its queries");
-        System.out.println("-add-service     adds local service(s) to the server");
-        System.out.println("-rm-service      removes local service(s) from the server");
-        System.out.println("-add-server      adds remote server(s) whose services are avilable to the server");
-        System.out.println("-rm-server       removes remote servers\n");
+        System.out.println("-add-service      adds local service(s) to the server");
+        System.out.println("-rm-service       removes local service(s) from the node");
+        System.out.println("-add-server       adds remote server(s) whose services will avilable to the etb node");
+        System.out.println("-rm-server        removes remote servers");
+        System.out.println("-add-claim        adds claim(s) to the etb node");
+        System.out.println("-rm-claim         removes claim(s) from the etb node");
+        System.out.println("-update-claim     updates an outdated claim");
+        System.out.println("-upgrade-claim    upgrades an outdated claim");
+        System.out.println("-reconst-claim    reconstructs an outdated claim\n");
     }
     
-    private void printServerDetails() {
-        System.out.println("==============================");
+    private void print() {
         System.out.println("hostIP : " + hostIP);
         System.out.println("port : " + port);
         System.out.println("git repo path : " + repoDirPath);
-        
-        System.out.println("------------------------------");
-        if (etcServices.size() == 0) {
-            System.out.println("local services : []");
-        }
-        
-        Set<String> serviceNames = etcServices.keySet();
-        Iterator<String> iterator = serviceNames.iterator();
-        
-        for (int i=1; iterator.hasNext(); i++) {
-            System.out.println("local service " + i);
-            String spekKey = iterator.next();
-            etcServices.get(spekKey).print("-> ", spekKey);
-        }
-        
-        System.out.println("------------------------------");
-        if (serverIDs.size() == 0) {
-            System.out.println("remote servers : []");
-        }
-        for (int i=0; i<serverIDs.size(); i++) {
-            System.out.println("remote server " + (i+1));
-            servers.get(serverIDs.get(i)).print("-> ");
-        }
-        System.out.println("==============================");
+        claims.print();
+        workflowsPack.print();
+        services.print();
+        serversPack.print();
     }
     
-    private void addServices() {
-        
-        while (true) {
-            Scanner in = new Scanner(System.in);
-            System.out.print("--> service name : ");
-            String serviceName = in.nextLine();
-            
-            if (etcServices.containsKey(serviceName)) {
-                System.out.println("=> a tool with the name '" + serviceName + "' exists \u001B[31m(operation not successful)\u001B[30m");
-                System.out.print("=> add more tools? [y] to add more : ");
-                if (!in.nextLine().equals("y"))
-                    break;
-                continue;
-            }
-            
-            String signatureStr;
-            ArrayList<String> signature = new ArrayList();
-            do {
-                System.out.print("--> service signature : ");
-                signatureStr = in.nextLine();
-                signature = new ArrayList(Arrays.asList(signatureStr.split(" "))); //TODO: better signature specification
-            } while (!validSignature(signature));
-            
-            System.out.print("--> number of invocation modes : ");
-            String modesCount = in.nextLine();
-            System.out.print("--> set of modes : ");
-            String toolExecModes = in.nextLine();
-            
-            //ArrayList<String> modeSet = glueCodeAutoGen.addToolWrapper(serviceName, signature.size(), Integer.parseInt(modesCount), toolExecModes);
-            ArrayList<String> modeSet = glueCodeAutoGen.addToolWrapper(serviceName, signature, Integer.parseInt(modesCount), toolExecModes);
-            
-            etcServices.put(serviceName, new serviceSpec(signature, modeSet));
-
-            System.out.println("=> tool added successfully");
-            System.out.print("=> add more tools? [y] to add more : ");
-            if (!in.nextLine().equals("y"))
-                break;
-        }
-        //System.out.println("=> getServiceNames() : " + etcServices.keySet().toString());
-        ArrayList<String> etcServiceNames = new ArrayList();
-        etcServiceNames.addAll(etcServices.keySet());
-        glueCodeAutoGen.updateExternPredBridgeFile(etcServiceNames);
-        save();
-    }
-    
-    private boolean validSignature(ArrayList<String> signature) {
-        ArrayList<String> signSpecs = new ArrayList();
-        signSpecs.add("string");
-        signSpecs.add("file");
-        signSpecs.add("string_list");
-        signSpecs.add("file_list");
-        
-        for (int i=0; i < signature.size(); i++) {
-            if (!signSpecs.contains(signature.get(i))) {
-                System.out.println("--> not a valid signature entry '" + signature.get(i) + "' \u001B[31m(signature not accepted)\u001B[30m");
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private void addServers() {
-        while (true) {
-            Scanner in = new Scanner(System.in);
-            System.out.print("--> server address : ");
-            String serverAddress = in.nextLine();
-            System.out.print("--> server port : ");
-            String serverPort = in.nextLine();
-
-            //communicating with the server and registering its services *** act as a client
-            clientMode cm = new clientMode(serverAddress, Integer.valueOf(serverPort));
-            if (cm.isConnected()) {
-                String remoteServicesStr = cm.newServicesRegistration();
-                if (servers.containsKey(serverAddress+serverPort)) {
-                    System.out.println("=> server already exists \u001B[31m(updating remote services)\u001B[30m");
-                    this.servers.replace(serverAddress+serverPort, new serverSpec(serverAddress, Integer.valueOf(serverPort), new ArrayList(Arrays.asList(remoteServicesStr.split(" ")))));
-                }
-                else {
-                    this.servers.put(serverAddress+serverPort, new serverSpec(serverAddress, Integer.valueOf(serverPort), new ArrayList(Arrays.asList(remoteServicesStr.split(" ")))));
-                    System.out.println("=> server added successfully");
-                }
-            }
-            else {
-                System.out.println("=> server could not be added \u001B[31m(operation not successful)\u001B[30m");
-            }
-    
-            System.out.print("=> add more servers? [y] to add more : ");
-            if (!in.nextLine().equals("y"))
-                break;
-        }
-        save();
-    }
-
-    private void removeServers() {
-        
-        System.out.println("------------------------------");
-        if (serverIDs.size() == 0) {
-            System.out.println("remote servers : []");
-        }
-        for (int i=0; i<serverIDs.size(); i++) {
-            System.out.println("remote server " + (i+1));
-            System.out.println("-> serverID : " + (i+1));
-            servers.get(serverIDs.get(i)).print("-> ");
-        }
-        System.out.println("==============================");
-        
-        while (true) {
-            Scanner in = new Scanner(System.in);
-            System.out.print("--> enter serverID : ");
-            String serverID = in.nextLine();
-            
-            if (Integer.valueOf(serverID) < 1 || Integer.valueOf(serverID) > serverIDs.size()) {
-                System.out.println("=> invalid serverID '" + serverID + "' \u001B[31m(removal not successful)\u001B[30m");
-                System.out.print("=> remove more servers? [y] to remove more : ");
-                if (!in.nextLine().equals("y"))
-                    break;
-                continue;
-            }
-            servers.remove(serverIDs.get(Integer.valueOf(serverID)-1));
-            serverIDs.remove(Integer.valueOf(serverID)-1);
-            
-            System.out.println("=> server removed successfully");
-            System.out.print("=> remove more servers? [y] to remove more : ");
-            if (!in.nextLine().equals("y"))
-                break;
-        }
-        save();
-    }
-
-    private void removeServices() {
-        
-        while (true) {
-            Scanner in = new Scanner(System.in);
-            System.out.print("--> service name : ");
-            String toolName = in.nextLine();
-            
-            //checking if workflow already exists with the same name
-            if (!etcServices.keySet().contains(toolName)) {
-                System.out.println("=> a service with the name '" + toolName + "' does not exist \u001B[31m(removal not successful)\u001B[30m");
-                System.out.print("=> remove more tools? [y] to remove more : ");
-                if (!in.nextLine().equals("y"))
-                    break;
-                continue;
-            }
-            etcServices.remove(toolName);
-            glueCodeAutoGen.removeToolWrapper(toolName);
-            System.out.println("=> tool removed successfully");
-            System.out.print("=> remove more tools? [y] to remove more : ");
-            if (!in.nextLine().equals("y"))
-                break;
-        }
-        ArrayList<String> etcServiceNames = new ArrayList();
-        etcServiceNames.addAll(etcServices.keySet());
-        glueCodeAutoGen.updateExternPredBridgeFile(etcServiceNames);
-        save();
-    }
-
     private void save() {
         
         JSONObject NewObj = new JSONObject();
         NewObj.put("port", this.port);
         NewObj.put("repoDirPath", this.repoDirPath);
+        NewObj.put("services", services.toJSONObject());
+        NewObj.put("servers", serversPack.toJSONObject());
+        NewObj.put("workflows", workflowsPack.toJSONObject());
+        NewObj.put("claims", claims.toJSONObject());
         
-        JSONArray etcServicesJSON = new JSONArray();
-        Set<String> serviceNames = etcServices.keySet();
-        Iterator<String> iterator = serviceNames.iterator();
-        while (iterator.hasNext()) {
-            String serviceSpecKey = iterator.next();
-            etcServicesJSON.add(etcServices.get(serviceSpecKey).toJSONObj(serviceSpecKey));
-        }
-        NewObj.put("services", etcServicesJSON);
-        
-        JSONArray serversSpecsJSON = new JSONArray();
-        Iterator<String> remoteServerIter = servers.keySet().iterator();
-        while (remoteServerIter.hasNext()) {
-            String serverID = remoteServerIter.next();
-            serversSpecsJSON.add(servers.get(serverID).toJSONObj());
-        }
-        NewObj.put("servers", serversSpecsJSON);
-
         try {
             FileWriter fw = new FileWriter(paramsFilePath);
             fw.write(NewObj.toJSONString());
@@ -503,7 +333,7 @@ public class etcServer {
     
     public queryResult processQuery(String serviceName, List<String> serviceArgs) {
         Expr queryExpr = new Expr(serviceName, serviceArgs);
-        if (etcServices.keySet().contains(serviceName)) {
+        if (services.containsService(serviceName)) {
             System.out.println("\t -> processing - " + serviceName + " - as a local service");
             System.out.println("\t -> service args " + serviceArgs.toString());
             String serviceInvMode = glueCodeAutoGen.getMode(serviceArgs);
@@ -544,11 +374,11 @@ public class etcServer {
             else {
                 System.out.println("\t\t -> evidence: " + extService.getEvidence());
             }
-            return new queryResult(retQueryExpr, extService.getEvidence());
+            return new queryResult(retQueryExpr, extService.getEvidence(), locBindings);
         }
         else {
             //getting all servers providing the service requested in the query
-            Collection<serverSpec> usefulServerSpec = servers.values().stream().filter(eachServerSpec -> eachServerSpec.getServices().contains(serviceName)).collect(Collectors.toSet());
+            Collection<serverSpec> usefulServerSpec = serversPack.getServers().values().stream().filter(eachServerSpec -> eachServerSpec.getServices().contains(serviceName)).collect(Collectors.toSet());
             if (usefulServerSpec.isEmpty()) {
                 return new queryResult();
             }
@@ -564,8 +394,6 @@ public class etcServer {
                 if (cm.isConnected()) {
                   return cm.remoteServiceExecution(serviceName, serviceArgs, repoDirPath);
                 }
-                //return remoteServiceExecution(getServerConnection(eachServer.getAddress(),eachServer.getPort()), serviceName, serviceArgs);
-                //return remoteServiceExecution(eachServer.getAddress(),eachServer.getPort(), serviceName, serviceArgs);
             }
             return new queryResult();
         }
@@ -599,6 +427,7 @@ public class etcServer {
     public void serverRun() {
         populate();
         while (true) {
+            print();
             System.out.println("waiting for a client ...");
             try (
                  ServerSocket serverSocket = new ServerSocket(this.port);
@@ -621,17 +450,7 @@ public class etcServer {
                     System.out.println("request being processed ... ");
                     //TODO: --> announce all the services I provide
                     System.out.println("request procssing done");
-                    
-                    String servicesStr = null;
-                    Iterator<String> serviceNameIter = etcServices.keySet().iterator();
-                    if (serviceNameIter.hasNext())
-                        servicesStr = serviceNameIter.next();
-                    //Set<String> serviceNames = etcServices.keySet();
-                    while (serviceNameIter.hasNext()) {
-                        servicesStr += " " + serviceNameIter.next();
-                    }
-                    toClientData.writeUTF(servicesStr);
-                    //toClientData.writeUTF("[processed of (" + request + ")");
+                    toClientData.writeUTF(services.getNames());
                 }
                 
                 else if (request.equals("execReqst")){
@@ -659,6 +478,13 @@ public class etcServer {
                     }
                     toClientData.writeUTF("done");
                     toClientData.writeUTF(qr.getEvidence());
+                    
+                    claimSpec newClaim = new claimSpec(new Expr(serviceName, serviceArgs));
+                    newClaim.generateSHA1(repoDirPath);
+                    newClaim.addAnswer(qr.getBindings());
+                    claims.add(newClaim);
+                    
+                    save();
                 }
                 
                 else if (request.equals("statusCheck")){
@@ -771,7 +597,7 @@ public class etcServer {
     }
     
     public static void main(String args[]){
-        etcServer FW = new etcServer();
+        etbNode FW = new etbNode();
         if (args.length == 0) {
             //running as a server
             FW.serverRun();
@@ -781,4 +607,5 @@ public class etcServer {
         }
 
     }
+
 }

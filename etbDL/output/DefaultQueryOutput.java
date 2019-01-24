@@ -32,14 +32,14 @@ public class DefaultQueryOutput implements QueryOutput {
         //System.out.println(goal.toString());
         if (!answers.isEmpty()) {
             if (answers.iterator().next().isEmpty()) {
-                System.out.println("  Yes.");
+                System.out.println("--> Yes.");
             } else {
                 for (Map<String, String> answer : answers) {
-                    System.out.println("  " + OutputUtils.bindingsToString(answer));
+                    System.out.println("--> answers: " + OutputUtils.bindingsToString(answer));
                 }
             }
         } else {
-            System.out.println("  No.");
+            System.out.println("--> No.");
         }
     }
 }

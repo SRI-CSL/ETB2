@@ -5,28 +5,18 @@ import java.util.*;
 import etb.etbDL.engine.IndexedSet;
 import etb.etbDL.utils.*;
 import etb.etbDL.output.OutputUtils;
-import etb.etbCS.etcServer;
+import etb.etbCS.etbNode;
 import etb.etbCS.utils.queryResult;
 
 import java.util.stream.Collectors;
 
 public class etbDatalogEngine {
-    //etbDatalog etbDL;
-    
     Set<goalNode> goals = new HashSet();
     Set<clauseNode> clauses = new HashSet();
     int index;
     
     boolean foundNewClaim = false, foundNewClause = false, foundNewGoal = false, goalUpdated = false;
-    
-    /*
-    public etbDatalogEngine(etbDatalog etbDL) {
-        //this.etbDL = etbDL;
-        this.goals.add(new goalNode(0, etbDL.getGoal(), "open"));
-        this.foundNewGoal = true;
-        this.index = 1;
-    }
-    */
+    String derivation = "";
     
     private void backChain() {
         Iterator<clauseNode> clauseIter = clauses.iterator();
@@ -56,7 +46,7 @@ public class etbDatalogEngine {
         }
     }
     
-    private void resolve(etcServer etcSS, etbDatalog dlPack) {
+    private void resolve(etbNode etcSS, etbDatalog dlPack) {
         Iterator<goalNode> goalIter = goals.iterator();
         while (goalIter.hasNext()) {
             goalNode gNode = goalIter.next();
@@ -65,13 +55,16 @@ public class etbDatalogEngine {
                 System.out.println("---------------------------");
                 System.out.println("=> goal being resolved: " + gNode.getLiteral().toString());
                 IndexedSet<Expr, String> goalFacts = new IndexedSet<>();
-                //goalFacts.addAll(etbDL.getExtDB().getFacts(gNode.getLiteral().getPredicate()));
                 goalFacts.addAll(dlPack.getExtDB().getFacts(gNode.getLiteral().getPredicate()));
-                int i = 1;
+                int i=1;
                 for (Expr fact : goalFacts) {
                     System.out.println("\t -> fact " + i + " : " + fact.toString());
                     Map<String, String> locBindings = new HashMap();
                     if(fact.unify(gNode.getLiteral(), locBindings)) {
+                        
+                        //System.out.println("\t -> fact ******* : " + fact.toString());
+                        derivation += fact.toString() + ".\n";
+                        
                         System.out.println("\t    bindings: " + OutputUtils.bindingsToString(locBindings));
                         clauses.add(new clauseNode(new Rule(fact, new ArrayList()), gNode, getPredEvidence(fact)));
                         foundNewClause = true;
@@ -83,9 +76,8 @@ public class etbDatalogEngine {
                 }
                 //adding useful rules
                 Collection<String> goalAsSet = Collections.singletonList(gNode.getLiteral().getPredicate());
-                //Collection<Rule> goalRules = etbDL.getIntDB().stream().filter(rule -> goalAsSet.contains(rule.getHead().getPredicate())).collect(Collectors.toSet());
                 Collection<Rule> goalRules = dlPack.getIntDB().stream().filter(rule -> goalAsSet.contains(rule.getHead().getPredicate())).collect(Collectors.toSet());
-                i = 1;
+                i=1;
                 boolean rulesFound = false;
                 for (Rule rule : goalRules) {
                     System.out.println("\t -> rule " + i + " : " + rule.toString());
@@ -93,25 +85,31 @@ public class etbDatalogEngine {
                     rule.getHead().unify(gNode.getLiteral(), locBindings);
                     System.out.println("\t    bindings: " + OutputUtils.bindingsToString(locBindings));
                     if (locBindings.size() > 0) {
+
+                        //System.out.println("\t -> rule ********* : " + rule.toString());
+                        derivation += rule.toString() + ".\n";
+                        
                         System.out.println("\t    rule after substitution : " + rule.substitute(locBindings).toString());
                         clauses.add(new clauseNode(rule.substitute(locBindings), gNode));
                         foundNewClause = true;
                         rulesFound = true;
                     }
-                    //System.out.println("\t   rule after substitution : " + rule.substitute(locBindings).toString());
-                    //clauses.add(new clauseNode(rule.substitute(locBindings), gNode));
-                    //foundNewClause = true;
                     i++;
                 }
                 if (!rulesFound) {
                     System.out.println("\t -> no matching rules");
                 }
                 //external tools
+                
                 queryResult qr = etcSS.processQuery(gNode.getLiteral().getPredicate(), gNode.getLiteral().getTerms());
                 
                 if (qr.getResultExpr() != null) {
                     //qr.print();
                     Expr toolInvResult = qr.getResultExpr();
+                    
+                    //System.out.println("\t -> toolInvResult ******* : " + toolInvResult.toString());
+                    derivation += toolInvResult.toString() + ".\n";
+                    
                     clauses.add(new clauseNode(new Rule(toolInvResult, new ArrayList()), gNode, qr.getEvidence()));
                     foundNewClause = true;
                 }
@@ -132,6 +130,10 @@ public class etbDatalogEngine {
         }
     }
 
+    public String getDerivation() {
+        return derivation;
+    }
+    
     private String getPredEvidence(Expr fact) {
         return "{serviceName: " + fact.getPredicate() + ", serviceParams: " + fact.getTerms().toString() + ", serviceType : pred}";
     }
@@ -182,7 +184,7 @@ public class etbDatalogEngine {
     }
     
     //runs the DL engine over input rules and facts in the DL suit
-    public Collection<Map<String, String>> run(etcServer etcSS, etbDatalog dlPack) {
+    public Collection<Map<String, String>> run(etbNode etcSS, etbDatalog dlPack) {
         
         this.goals.add(new goalNode(0, dlPack.getGoal(), "open")); //initial goal instantiation
         this.foundNewGoal = true;
@@ -210,7 +212,6 @@ public class etbDatalogEngine {
             }
         } while (foundNewGoal);
 
-        //Expr mainGoal = etbDL.getGoal();
         Expr mainGoal = dlPack.getGoal();
         //grabs goals and their corresponding claims
         Collection<Map<String, String>> answers = new ArrayList<>();
@@ -225,6 +226,10 @@ public class etbDatalogEngine {
                     if(mainGoal.unify(gClaims.get(i), newBindings)) {
                         answers.add(newBindings);
                     }
+                }
+                
+                if (gClaims.size() == 0) {
+                    return null; 
                 }
                 break;
             }

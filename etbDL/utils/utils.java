@@ -19,6 +19,7 @@ import java.lang.InterruptedException;
 import java.io.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.nio.file.*;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -92,6 +93,47 @@ public class utils {
         return false;
     }
 
-    
+    /*
+    public static boolean checkFileInDirectory(String filePath, String repoDirPath) {
+        
+        Path p = Paths.get(filePath);
+        File file = new File(filePath);
+        if (p.isAbsolute()) {
+            if (file.exists()) {
+                System.out.println("file EXISTS -- an absolute path");
+                return filePath.contains(repoDirPath);
+            }
+            else {
+                System.out.println("file does NOT EXIST -- an absolute path");
+                file = new File(repoDirPath + "/"+ filePath);
+                return file.exists();
+            }
+        }
+        else {
+            System.out.println("NOT an absolute path");
+            file = new File(repoDirPath + "/"+ filePath);
+            return file.exists();
+        }
+    }
+*/
+    public static String getFilePathInDirectory(String filePath, String repoDirPath) {
+        
+        Path p = Paths.get(filePath);
+        File file = new File(filePath);
+        if (p.isAbsolute() && file.exists()) {
+            return filePath;
+        }
+        else {
+            filePath = repoDirPath + "/"+ filePath;
+            file = new File(filePath);
+            if (file.exists()) {
+                return file.getAbsolutePath();
+                //return filePath;
+            }
+            else
+                return null;
+        }
+    }
+
 
 }

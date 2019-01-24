@@ -50,7 +50,7 @@ public class serverSpec {
         return services;
     }
     
-    public JSONObject toJSONObj() {
+    public JSONObject toJSONObject() {
         
         JSONObject NewObj = new JSONObject();
         NewObj.put("address", address);
@@ -79,6 +79,21 @@ public class serverSpec {
         }
          */
     }
+
+    public void print() {
+        System.out.println("--> hostIP : " + address);
+        System.out.println("--> port: " + port);
+        System.out.println("--> services: " + services.toString());
+        /*
+         if (isRunning()) {
+         System.out.println(indent + "status:\u001B[32m running\u001B[30m");
+         }
+         else {
+         System.out.println(indent + "status:\u001B[31m down\u001B[30m");
+         }
+         */
+    }
+
     
     public boolean isRunning() {
         Socket serverSocket = new Socket();

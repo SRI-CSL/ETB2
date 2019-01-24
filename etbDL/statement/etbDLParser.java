@@ -62,7 +62,7 @@ public class etbDLParser {
     }
     
     // parses an expression
-    private static Expr parseExpr(StreamTokenizer scan) throws DatalogException, IOException {
+    public static Expr parseExpr(StreamTokenizer scan) throws DatalogException, IOException {
         boolean negated = false, builtInExpected = false;
         String lhs = null;
         
@@ -111,7 +111,14 @@ public class etbDLParser {
             }
         }
         
-        Expr e = new Expr(lhs, terms);
+        //System.out.println("terms size : " + terms.size());
+        //String signature = terms.remove(terms.size()-2);
+        //String mode = terms.remove(terms.size()-1);
+        //System.out.println("signature : " + signature);
+        //System.out.println("mode : " + mode);
+
+        Expr e = new Expr(lhs, terms, terms.remove(terms.size()-2), terms.remove(terms.size()-1));
+        //Expr e = new Expr(lhs, terms);
         e.negated = negated;
         return e;
     }
@@ -119,35 +126,66 @@ public class etbDLParser {
     private static List<String> getPredicateTerms(StreamTokenizer scan) throws IOException, DatalogException {
         //not builtin operator (i.e., predicate) and next scan is '('... diving into args of predicate)
         List<String> terms = new ArrayList<>();
+        String signature = "", mode = "";
         do {
-            if(scan.nextToken() == StreamTokenizer.TT_WORD) {// a word
-                terms.add(readComplexTerm(scan.sval, scan));
+            if(scan.nextToken() == StreamTokenizer.TT_WORD) {//word
+                String wordTerm = readComplexTerm(scan.sval, scan);
+                terms.add(wordTerm);
+                signature += "1";
+                if (Character.isUpperCase(wordTerm.charAt(0)))
+                    mode += "-";
+                else
+                    mode += "+";
             }
-            else if(scan.ttype == '"' || scan.ttype == '\'') {//TODO: separate handling of single and double quotes
-                String xxx = scan.sval;
-                if (xxx.contains("/") || xxx.contains(".")) {
-                    terms.add("file(" + xxx + ")");
+            else if(scan.ttype == '"' || scan.ttype == '\'') {
+                //TODO: separate handling of single and double quotes
+                String restScan = scan.sval;
+                if (restScan.contains("/") || restScan.contains(".")) {
+                    terms.add("file(" + restScan + ")");
+                    signature += "2";
+                    mode += "+";
                 }
                 else {
-                    File file = new File(xxx);
-                    //String filePath = file.getCanonicalPath();
-                    //System.out.println("filePath: " + filePath);
-                    if (file.exists()) {//a file variable with no / and .
-                        terms.add("file(" + xxx + ")");
+                    File file = new File(restScan);
+                    if (file.exists()) {//TODO: a file variable with no / and .??
+                        terms.add("file(" + restScan + ")");
+                        signature += "2";
+                        mode += "+";
                     }
                     else {//normal variable
-                        System.out.println("a valid non-file string");
+                        System.out.println("a valid non-file string");//TODO: does this really happen?
+                        signature += "1";
+                        if (Character.isUpperCase(restScan.charAt(0)))
+                            mode += "-";
+                        else
+                            mode += "+";
                     }
                 }
             }
             else if(scan.ttype == StreamTokenizer.TT_NUMBER) {// a number
                 terms.add(numberToString(scan.nval));
+                signature += "1";
+                mode += "+";
             }
             else if(scan.ttype == '[') {// a list
                 
                 List<String> listTerms = getPredicateTerms(scan);
                 if(scan.ttype != ']') {
                     throw new DatalogException("[line " + scan.lineno() + "] list is expected to end with ']'");
+                }
+                
+                //System.out.println("terms size : " + listTerms.size());
+                String signature2 = listTerms.remove(listTerms.size()-2);
+                String mode2 = listTerms.remove(listTerms.size()-1);
+                //System.out.println("signature2 : " + signature2);
+                //System.out.println("mode2 : " + mode2);
+                //TODO: efficient/better logic
+                mode += "+";
+                if (listTerms.get(0).contains("file(")) {
+                    signature += "4";
+                }
+                else {
+                    signature += "3";
                 }
                 
                 Iterator<String> iterator = listTerms.iterator();
@@ -161,6 +199,8 @@ public class etbDLParser {
                 throw new DatalogException("[line " + scan.lineno() + "] '" + scan.sval + "' is not a valid ETB data type");
             }
         } while(scan.nextToken() == ',');
+        terms.add(signature);
+        terms.add(mode);
         return terms;
     }
     
