@@ -189,6 +189,7 @@ public class etbNode {
             }
         }
         else if (args.length == 2) {
+            instantiate();
             populate();
             if (args[0].equals("-query")){
                 List<String> serviceArgs = inQuery2Params(args[1]);
@@ -282,7 +283,7 @@ public class etbNode {
         System.out.println("Options: \n");
         System.out.println("-help/-h          shows this help menue");
         System.out.println("-init             initialises an etb node at a given location");
-        System.out.println("-info             displays details of the node, like its port, claims, workflows, local services and available remote servers/services");
+        System.out.println("-node-info        displays details of the node, like its port, claims, workflows, local services and available remote servers/services");
         System.out.println("-clean            removes available local services and remote servers from the server");
         System.out.println("-uninit           deletes initialisation componenets of the node");
         System.out.println("-set-port <int>   sets <int> as the port number of the server");
@@ -338,17 +339,8 @@ public class etbNode {
             System.out.println("\t -> service args " + serviceArgs.toString());
             String serviceInvMode = glueCodeAutoGen.getMode(serviceArgs);
             System.out.println("\t\t -> service invocation mode: " + serviceInvMode);
-            /*
-             ArrayList<String> serviceSign = this.etcServices.get(serviceName).getSignature();
-            System.out.println("\t\t -> service signature: " + serviceSign.toString());
-            
-            if (this.etcServices.get(serviceName).getModes().contains(serviceInvMode)) {
-                System.out.println("\t\t\t -> known mode");
-            }
-            else {
-                System.out.println("\t\t\t -> unknown mode");
-            }
-            */
+            String serviceSign = services.get(serviceName).getSignature();
+            System.out.println("\t\t -> service signature: " + serviceSign);
             
             Iterator<String> argsIter = serviceArgs.iterator();
             ArrayList<String> serviceArgs2 = new ArrayList();
@@ -357,7 +349,7 @@ public class etbNode {
             }
             
             externPred2Service extService = new externPred2ServiceInstance();
-            Expr retQueryExpr = extService.invoke(serviceName, serviceArgs2, serviceInvMode);
+            Expr retQueryExpr = extService.invoke(serviceName, serviceArgs2, serviceInvMode, serviceSign);
             
             if (retQueryExpr == null) {
                 System.out.println("\t\t ->\u001B[31m [warning]\u001B[30m service could not be executed (please check previous error logs)");
@@ -400,7 +392,9 @@ public class etbNode {
     }
     
     //server mode
-    public static String getFile(String fileName, DataInputStream fromClientData) throws IOException {
+    public static String getFileOLD(String fileName, DataInputStream fromClientData) throws IOException {
+        //needs to check first if claim already exists in the server
+        //then the computation follows
         String tempDirPath = "TEMP";
         File tempDir = new File(tempDirPath);
         if (!tempDir.isDirectory()) {
@@ -423,8 +417,29 @@ public class etbNode {
         fos.close();
         return fileName;
     }
+
+    public static String getFile(String claimWorkingDir, String fileName, DataInputStream fromClientData) throws IOException {
+        //needs to check first if claim already exists in the server
+        //then the computation follows
+        
+        fileName = claimWorkingDir + "/temp_" + (new File(claimWorkingDir).list().length + 1) + "_" + fileName;
+
+        File fout = new File(fileName);
+        FileOutputStream fos = new FileOutputStream(fout);
+        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
+        
+        String line;
+        while(!(line = fromClientData.readUTF()).equals("EOF")) {
+            bw.write(line);
+            bw.newLine();
+        }
+        bw.close();
+        fos.close();
+        return fileName;
+    }
     
     public void serverRun() {
+        instantiate();
         populate();
         while (true) {
             print();
@@ -479,7 +494,8 @@ public class etbNode {
                     toClientData.writeUTF("done");
                     toClientData.writeUTF(qr.getEvidence());
                     
-                    claimSpec newClaim = new claimSpec(new Expr(serviceName, serviceArgs));
+                    //claimSpec newClaim = new claimSpec(new Expr(serviceName, serviceArgs));
+                    claimSpec newClaim = new claimSpec(qr.getResultExpr());
                     newClaim.generateSHA1(repoDirPath);
                     newClaim.addAnswer(qr.getBindings());
                     claims.add(newClaim);
@@ -505,15 +521,27 @@ public class etbNode {
 
     private List<String> getArgsFromClient(DataInputStream fromClientData, DataOutputStream toClientData) throws IOException {
         List<String> serviceArgs = new ArrayList();
+        
+        //setting up a directory to save temporary files
+        String claimWorkingDirPath = repoDirPath + "/TEMP";
+        File claimWorkingDir = new File(claimWorkingDirPath);
+        if (!claimWorkingDir.isDirectory()) {
+            claimWorkingDir.mkdir();
+        }
+        claimWorkingDirPath += "/claim" + (claimWorkingDir.list().length + 1);
+        claimWorkingDir = new File(claimWorkingDirPath);
+        claimWorkingDir.mkdir();
+        
         String serviceArgType;
         while(!(serviceArgType = fromClientData.readUTF()).equals("done")) {
             System.out.println("serviceArgType : " + serviceArgType);
             if (serviceArgType.equals("file_list")) {
+                //argument is list of files
                 System.out.println("-> a list of files as arg");
-                String listElement, listRead = "listIdent";
-                while(!(listElement = fromClientData.readUTF()).equals("file_list_done")) {
-                    System.out.println("\t -> file : " + listElement);
-                    String eachFilePath = listElement;
+                String eachFilePath, listRead = "listIdent";
+                while(!(eachFilePath = fromClientData.readUTF()).equals("file_list_done")) {
+                    //System.out.println("\t -> file : " + listElement);
+                    //String eachFilePath = listElement;
                     System.out.println("\t\t -> file : " + eachFilePath);
                     String SHA1 = fromClientData.readUTF();
                     System.out.println("\t\t -> file SHA1 : " + SHA1);
@@ -527,14 +555,16 @@ public class etbNode {
                             System.out.println("\t\t -> SHA1 does not match");
                             toClientData.writeUTF("sendMeCopy");
                             File eachFile = new File(eachFilePath);
-                            eachFilePath = getFile(eachFile.getName(), fromClientData);
+                            //eachFilePath = getFile(eachFile.getName(), fromClientData);
+                            eachFilePath = getFile(claimWorkingDirPath, eachFile.getName(), fromClientData);
                         }
                     }
                     else {
                         System.out.println("\t\t -> file NOT in server repo");
                         toClientData.writeUTF("sendMeCopy");
                         File eachFile = new File(eachFilePath);
-                        eachFilePath = getFile(eachFile.getName(), fromClientData);
+                        //eachFilePath = getFile(eachFile.getName(), fromClientData);
+                        eachFilePath = getFile(claimWorkingDirPath, eachFile.getName(), fromClientData);
                     }
                     listRead += " file(" + eachFilePath + ")";
                 }
@@ -542,7 +572,7 @@ public class etbNode {
                 serviceArgs.add(listRead);
             }
             else if (serviceArgType.equals("file")) {
-                System.out.println("-> a list of files as arg");
+                System.out.println("-> a file as arg");
                 String fileElement = fromClientData.readUTF();
                 System.out.println("\t -> file : " + fileElement);
                 String SHA1 = fromClientData.readUTF();
@@ -558,14 +588,16 @@ public class etbNode {
                         System.out.println("\t\t -> SHA1 does not match");
                         toClientData.writeUTF("sendMeCopy");
                         File eachFile = new File(fileElement);
-                        fileElement = getFile(eachFile.getName(), fromClientData);
+                        //fileElement = getFile(eachFile.getName(), fromClientData);
+                        fileElement = getFile(claimWorkingDirPath, eachFile.getName(), fromClientData);
                     }
                 }
                 else {
                     System.out.println("\t\t -> file NOT in server repo");
                     toClientData.writeUTF("sendMeCopy");
                     File eachFile = new File(fileElement);
-                    fileElement = getFile(eachFile.getName(), fromClientData);
+                    //fileElement = getFile(eachFile.getName(), fromClientData);
+                    fileElement = getFile(claimWorkingDirPath, eachFile.getName(), fromClientData);
                 }
                 serviceArgs.add("file(" + fileElement + ")");
             }

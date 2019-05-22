@@ -20,6 +20,7 @@ public class claimsPack {
     public claimsPack() {
         claims = new HashMap();
     }
+    
     public claimsPack(JSONArray claimsJSON) {
         Iterator<JSONObject> claimsIter = claimsJSON.iterator();
         while (claimsIter.hasNext()) {
@@ -149,11 +150,10 @@ public class claimsPack {
     }
 
     public void print() {
-        if (claims.size() == 0) {
-            System.out.println("==> claims table is empty");
-        }
+        System.out.println("==> total number of claims: " + claims.size());
+        int count = 1;
         for (String claimID : claims.keySet()) {
-            System.out.println("==> ID : " + claimID);
+            System.out.println("==> [claim " + count++ + "] ID : " + claimID);
             claims.get(claimID).print();
         }
     }

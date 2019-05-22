@@ -61,10 +61,7 @@ public class etbDatalogEngine {
                     System.out.println("\t -> fact " + i + " : " + fact.toString());
                     Map<String, String> locBindings = new HashMap();
                     if(fact.unify(gNode.getLiteral(), locBindings)) {
-                        
-                        //System.out.println("\t -> fact ******* : " + fact.toString());
                         derivation += fact.toString() + ".\n";
-                        
                         System.out.println("\t    bindings: " + OutputUtils.bindingsToString(locBindings));
                         clauses.add(new clauseNode(new Rule(fact, new ArrayList()), gNode, getPredEvidence(fact)));
                         foundNewClause = true;
@@ -85,10 +82,7 @@ public class etbDatalogEngine {
                     rule.getHead().unify(gNode.getLiteral(), locBindings);
                     System.out.println("\t    bindings: " + OutputUtils.bindingsToString(locBindings));
                     if (locBindings.size() > 0) {
-
-                        //System.out.println("\t -> rule ********* : " + rule.toString());
                         derivation += rule.toString() + ".\n";
-                        
                         System.out.println("\t    rule after substitution : " + rule.substitute(locBindings).toString());
                         clauses.add(new clauseNode(rule.substitute(locBindings), gNode));
                         foundNewClause = true;
@@ -99,24 +93,18 @@ public class etbDatalogEngine {
                 if (!rulesFound) {
                     System.out.println("\t -> no matching rules");
                 }
+                
                 //external tools
-                
                 queryResult qr = etcSS.processQuery(gNode.getLiteral().getPredicate(), gNode.getLiteral().getTerms());
-                
                 if (qr.getResultExpr() != null) {
-                    //qr.print();
                     Expr toolInvResult = qr.getResultExpr();
-                    
-                    //System.out.println("\t -> toolInvResult ******* : " + toolInvResult.toString());
                     derivation += toolInvResult.toString() + ".\n";
-                    
                     clauses.add(new clauseNode(new Rule(toolInvResult, new ArrayList()), gNode, qr.getEvidence()));
                     foundNewClause = true;
                 }
                 else {
                     System.out.println("\t -> no matching external tools");
                 }
-                
                 //checking if resolved
                 if (foundNewClause) {
                     System.out.println("=> goal successfully resolved");

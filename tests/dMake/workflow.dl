@@ -18,6 +18,7 @@ mainLinux(Src1, H1, Src2, H2, Main, Exe) :- main(linux, Src1, H1, Src2, H2, Main
 
 
 mainLinux("repo/src/s1.txt", "repo/src/h1.txt", "repo/src/s2.txt", "repo/src/h2.txt", "repo/src/main.c", EE)?
+mainCheck("repo/src/s1.txt", "repo/src/h1.txt", "repo/src/s2.txt", "repo/src/h2.txt", "repo/src/main.c", EE)
 
 
 

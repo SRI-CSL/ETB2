@@ -10,7 +10,7 @@ import org.json.simple.JSONArray;
 import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
 import etb.etbDL.statements.etbDLParser;
-import etb.etbCS.etcServer;
+//import etb.etbCS.etcServer;
 import etb.etbDL.services.*;
 
 import etb.etbDL.utils.*;
@@ -25,6 +25,9 @@ public class servicesPack {
     }
     
     public servicesPack(JSONArray servicesJSON) {
+        if (servicesJSON == null) {
+            System.out.println("\u001B[31m(null services)\u001B[30m");
+        }
         Iterator<JSONObject> serviceIter = servicesJSON.iterator();
         while (serviceIter.hasNext()) {
             JSONObject serviceSpecObj = (JSONObject) serviceIter.next();
@@ -173,15 +176,17 @@ public class servicesPack {
     }
     
     public void print() {
-        if (services.size() == 0) {
-            System.out.println("==> no services found");
-        }
+        System.out.println("==> total number of local services: " + services.size());
+        int count = 1;
         for (String serviceID : services.keySet()) {
-            System.out.println("==> ID : " + serviceID);
+            System.out.println("==> [service " + count++ + "] ID : " + serviceID);
             services.get(serviceID).print();
         }
     }
     
+    public serviceSpec get(String serviceID) {
+        return services.get(serviceID);
+    }
     
 }
 

@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
 import etb.etbDL.statements.etbDLParser;
-import etb.etbCS.etcServer;
+//import etb.etbCS.etcServer;
 
 import etb.etbDL.utils.*;
 import etb.etbDL.output.*;
@@ -215,11 +215,10 @@ public class workflowsPackage {
     }
     
     public void print() {
-        if (workflows.size() == 0) {
-            System.out.println("==> no workflows found");
-        }
+        System.out.println("==> total number of workflows: " + workflows.size());
+        int count = 1;
         for (String workflowID : workflows.keySet()) {
-            System.out.println("==> ID : " + workflowID);
+            System.out.println("==> [workflow " + count++ + "] ID : " + workflowID);
             workflows.get(workflowID).print();
         }
     }

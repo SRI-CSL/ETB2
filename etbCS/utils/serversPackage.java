@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
 import etb.etbDL.statements.etbDLParser;
-import etb.etbCS.etcServer;
+//import etb.etbCS.etcServer;
 import etb.etbCS.clientMode;
 
 import etb.etbDL.utils.*;
@@ -104,11 +104,10 @@ public class serversPackage {
     }
     
     public void print() {
-        if (servers.size() == 0) {
-            System.out.println("==> no servers found");
-        }
+        System.out.println("==> total number of servers: " + servers.size());
+        int count = 1;
         for (String serverID : servers.keySet()) {
-            System.out.println("==> ID : " + serverID);
+            System.out.println("==> [server " + count++ + "] ID : " + serverID);
             servers.get(serverID).print();
         }
     }

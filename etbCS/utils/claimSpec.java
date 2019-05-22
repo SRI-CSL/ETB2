@@ -142,20 +142,29 @@ public class claimSpec {
     
     public void generateSHA1(String repoDirPath) {
         SHA1List = new ArrayList();
+        
+        //System.out.println("query.getMode() : " + query.getMode());
+        
         for (int i=0; i<query.getMode().length(); i++) {
+            //System.out.println("current i : " + i);
             if (query.getMode().charAt(i) == '+') {
+                //System.out.println("current interesting i (input i) : " + i);
                 if (query.getSignature().charAt(i) == '2') {
+                    //System.out.println("FILE");
                     String eachFilePath = query.getTerms().get(i);
                     eachFilePath = eachFilePath.substring(5, eachFilePath.length()-1);
+                    //System.out.println("eachFilePath :" + eachFilePath);
                     SHA1List.add(utils.getSHA1(utils.getFilePathInDirectory(eachFilePath, repoDirPath)));
                 }
                 else if (query.getSignature().charAt(i) == '4') {
+                    System.out.println("LIST OF FILES");
                     List<String> eachFileLS = Arrays.asList(query.getTerms().get(i).split(" "));
                     //eachFileLS.remove(0);
                     eachFileLS = eachFileLS.subList(1, eachFileLS.size());
                     String SHA1Str = "";
                     for (String eachFilePath : eachFileLS) {
                         eachFilePath = eachFilePath.substring(5, eachFilePath.length()-1);
+                        //System.out.println("eachFilePath :" + eachFilePath);
                         SHA1Str += " " + utils.getSHA1(utils.getFilePathInDirectory(eachFilePath, repoDirPath));
                     }
                     SHA1List.add(SHA1Str);
@@ -191,17 +200,18 @@ public class claimSpec {
         
         System.out.println("--> SHA1List : " + SHA1List.toString());
         System.out.println("--> derivationPath : " + this.derivationPath);
-        System.out.println("--> derivation : ");
-        try {
-            BufferedReader br = new BufferedReader(new FileReader(derivationPath));
-            String line = null;
-            while ((line = br.readLine()) != null) {
-                System.out.println("\t" + line);
+        if (this.derivationPath != null) {
+            System.out.println("--> derivation : ");
+            try {
+                BufferedReader br = new BufferedReader(new FileReader(derivationPath));
+                String line = null;
+                while ((line = br.readLine()) != null) {
+                    System.out.println("\t" + line);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
-        
     }
     
     public int checkStatus(String repoDirPath, Map<String, workFlowSpec> workflows) {
