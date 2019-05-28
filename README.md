@@ -1,5 +1,4 @@
-How to use ETB2
-===================
+# How to use ETB2
 
 (1) After cloning the ETB2 directory, go into the directory and run 'make'
 
