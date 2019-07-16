@@ -15,31 +15,31 @@ import etb.etbDL.output.*;
 public class claimSpec {
     
     String repoDirPath;
-    
     String ID;
     Expr query;
     Collection<Map<String, String>> answers = new ArrayList<>();
     ArrayList<String> SHA1List = new ArrayList();
     String derivationPath;
-    
     String wfName;
     String wfSHA1;
-    
     int status = 0;
     
-    
-    public claimSpec(Expr query, Collection<Map<String, String>> answers, String wfName, String wfSHA1) {
-        this.query = query;
-        this.ID = query.getPredicate() + query.getSignature() + query.getMode();
-        this.answers = answers;
-        this.wfName = wfName;
-        this.wfSHA1 = wfSHA1;
-    }
-    
-    public claimSpec(String repoDirPath, Expr query, Collection<Map<String, String>> answers, String wfName, String wfSHA1, String derivation) {
+    /*
+    public claimSpec(String repoDirPath, Expr query, Collection<Map<String, String>> answers, String wfName, String wfSHA1, String derivation) {//old code
         this.repoDirPath = repoDirPath;
         this.query = query;
         this.ID = query.getPredicate() + query.getSignature() + query.getMode();
+        this.answers = answers;
+        generateSHA1(repoDirPath);
+        setClaimDerivation(repoDirPath, derivation);
+        this.wfName = wfName;
+        this.wfSHA1 = wfSHA1;
+    }
+    */
+    public claimSpec(String repoDirPath, Expr query, Collection<Map<String, String>> answers, String wfName, String wfSHA1, String derivation, int claimsSize) {
+        this.repoDirPath = repoDirPath;
+        this.query = query;
+        this.ID = "etbClaim" + claimsSize++;
         this.answers = answers;
         generateSHA1(repoDirPath);
         setClaimDerivation(repoDirPath, derivation);
@@ -142,9 +142,6 @@ public class claimSpec {
     
     public void generateSHA1(String repoDirPath) {
         SHA1List = new ArrayList();
-        
-        //System.out.println("query.getMode() : " + query.getMode());
-        
         for (int i=0; i<query.getMode().length(); i++) {
             //System.out.println("current i : " + i);
             if (query.getMode().charAt(i) == '+') {
@@ -153,11 +150,10 @@ public class claimSpec {
                     //System.out.println("FILE");
                     String eachFilePath = query.getTerms().get(i);
                     eachFilePath = eachFilePath.substring(5, eachFilePath.length()-1);
-                    //System.out.println("eachFilePath :" + eachFilePath);
                     SHA1List.add(utils.getSHA1(utils.getFilePathInDirectory(eachFilePath, repoDirPath)));
                 }
                 else if (query.getSignature().charAt(i) == '4') {
-                    System.out.println("LIST OF FILES");
+                    //System.out.println("LIST OF FILES");
                     List<String> eachFileLS = Arrays.asList(query.getTerms().get(i).split(" "));
                     //eachFileLS.remove(0);
                     eachFileLS = eachFileLS.subList(1, eachFileLS.size());
@@ -254,7 +250,7 @@ public class claimSpec {
         try {
             etbDatalog dlPack = new etbDatalog();
             String wfScriptPath = workflows.get(wfName).getScriptPath();
-            dlPack.parseToDatalog(wfScriptPath);
+            dlPack.parseToDatalog(wfScriptPath, repoDirPath);
             dlPack.setGoal(query);
             etbDatalogEngine dlEngine = new etbDatalogEngine();
             Collection<Map<String, String>> updatedAnswers = dlEngine.run(etcSS, dlPack);//TODO: single claim derivation
@@ -278,7 +274,7 @@ public class claimSpec {
         try {
             etbDatalog dlPack = new etbDatalog();
             String wfScriptPath = workflows.get(wfName).getScriptPath();
-            dlPack.parseToDatalog(wfScriptPath);
+            dlPack.parseToDatalog(wfScriptPath, repoDirPath);
             dlPack.setGoal(query);
             etbDatalogEngine dlEngine = new etbDatalogEngine();
             Collection<Map<String, String>> updatedAnswers = dlEngine.run(etcSS, dlPack);//TODO: single claim derivation
@@ -309,7 +305,7 @@ public class claimSpec {
                 try {
                     etbDatalog dlPack = new etbDatalog();
                     String wfScriptPath = workflows.get(wfName).getScriptPath();
-                    dlPack.parseToDatalog(workflows.get(wfName).getScriptPath());
+                    dlPack.parseToDatalog(workflows.get(wfName).getScriptPath(), repoDirPath);
                     dlPack.setGoal(query);
                     etbDatalogEngine dlEngine = new etbDatalogEngine();
                     Collection<Map<String, String>> updatedAnswers = dlEngine.run(etcSS, dlPack);//TODO: single claim derivation

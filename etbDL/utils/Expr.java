@@ -15,10 +15,7 @@ public class Expr implements Indexable<String> {
 
     private String predicate;
     private List<String> terms;
-    
-    //public ArrayList<Integer> listPositions = new ArrayList();
     public boolean negated = false;
-
     String signature, mode;
     
     public Expr(String predicate, List<String> terms) {

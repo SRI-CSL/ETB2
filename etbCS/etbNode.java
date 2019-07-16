@@ -1,4 +1,4 @@
-package etb.etbCS;
+   package etb.etbCS;
 
 import java.util.*;
 import org.json.simple.JSONArray;
@@ -15,7 +15,6 @@ import etb.etbCS.utils.*;
 import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
 import etb.etbDL.statements.etbDLParser;
-
 import etb.etbDL.utils.*;
 import etb.etbDL.services.*;
 import etb.etbDL.output.*;
@@ -28,11 +27,9 @@ public class etbNode {
 
     servicesPack services;
     serversPackage serversPack;
-    workflowsPackage workflowsPack;
+    workFlowsPackage workflowsPack;
     claimsPack claims;
-    
     String paramsFilePath = System.getProperty("user.dir") + "/params.json";
-    
     JSONObject nodeParamsJSONObj = new JSONObject();
     
     public etbNode() {
@@ -45,7 +42,7 @@ public class etbNode {
         
         services = new servicesPack();
         serversPack = new serversPackage();
-        workflowsPack = new workflowsPackage();
+        workflowsPack = new workFlowsPackage();
         claims = new claimsPack();
     }
     
@@ -91,6 +88,60 @@ public class etbNode {
         }
     }
 
+    public void initialise(String initFilePath) {
+        File paramsFile = new File(paramsFilePath);
+        if (paramsFile.exists()){
+            System.out.println("--> \u001B[31m[warning]\u001B[30m initialised ETB node already exists at this location (use -h to see more options)");
+            return;
+        }
+        
+        try {
+            JSONParser parser = new JSONParser();
+            //Object serviceSpecObj = parser.parse(new FileReader(initFilePath));
+            JSONObject initSpecJSON = (JSONObject) parser.parse(new FileReader(initFilePath));
+            
+            String port0 = (String) initSpecJSON.get("port");
+            try {
+                this.port = Integer.valueOf(port0.trim());
+            }
+            catch (NumberFormatException e) {
+                System.out.println("=> no port or non-numeric port is given \u001B[31m(operation not successful)\u001B[30m");
+            }
+            
+            String repoDirPath0 = (String) initSpecJSON.get("repoDirPath");
+            if (repoDirPath0 == null) {
+                System.out.println("=> no valid repository is given \u001B[31m(operation not successful)\u001B[30m");
+                return;
+            }
+            this.repoDirPath = repoDirPath0.trim();
+            File repoDir = new File(repoDirPath);
+            if (repoDir.exists() && repoDir.isDirectory()){
+                try {
+                    File repoDirCan = new File(repoDir.getCanonicalPath());
+                    this.repoDirPath = repoDirCan.getAbsolutePath();
+                }
+                catch (IOException e) {
+                    System.out.println("\u001B[31m[error]\u001B[30m canonical path for file not found");
+                    System.out.println(e.getMessage());
+                }
+            }
+            else {
+                System.out.println("\u001B[31m[error]\u001B[30m please provide a valid path");
+            }
+            
+            save();
+            System.out.println("ETB node initialised (use -h to see more options to update the node)");
+
+            
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        
+    }
+    
+    
     private void instantiate() {
         try {
             JSONParser parser = new JSONParser();
@@ -111,7 +162,7 @@ public class etbNode {
         
         services = new servicesPack((JSONArray) nodeParamsJSONObj.get("services"));
         serversPack = new serversPackage((JSONArray) nodeParamsJSONObj.get("servers"));
-        workflowsPack = new workflowsPackage(repoDirPath, (JSONArray) nodeParamsJSONObj.get("workflows"));
+        workflowsPack = new workFlowsPackage(repoDirPath, (JSONArray) nodeParamsJSONObj.get("workflows"));
         claims = new claimsPack((JSONArray) nodeParamsJSONObj.get("claims"));
         
     }
@@ -124,12 +175,12 @@ public class etbNode {
             }
             else if (args[0].equals("-uninit")) {
                 utils.runCMD0("rm -f etb/wrappers/* wrappers/* " + paramsFilePath);
-                glueCodeAutoGen.updateExternPredBridgeFile();
+                services.generateDefaultBridgeFile();
                 System.exit(1);
             }
             else if (args[0].equals("-clean")) {
                 utils.runCMD0("rm -f etb/wrappers/* wrappers/*");
-                glueCodeAutoGen.updateExternPredBridgeFile();
+                services.generateDefaultBridgeFile();
                 instantiate();
                 save();
                 System.exit(1);
@@ -147,33 +198,6 @@ public class etbNode {
                 else if (args[0].equals("-claims-status")){
                     claims.checkStatus(workflowsPack.getWorkflows(), repoDirPath);
                 }
-                
-                else if (args[0].equals("-add-workflow")){
-                    workflowsPack.add();
-                    save();
-                }
-                else if (args[0].equals("-rm-workflow")){
-                    workflowsPack.remove();
-                    save();
-                }
-
-                else if (args[0].equals("-add-claim")){
-                    claims.add(workflowsPack.getWorkflows(), repoDirPath, this);
-                    save();
-                }
-                else if (args[0].equals("-rm-claim")){
-                    claims.remove();
-                    save();
-                }
-
-                else if (args[0].equals("-add-service")){
-                    services.add();
-                    save();
-                }
-                else if (args[0].equals("-rm-service")){
-                    services.remove();
-                    save();
-                }
                 else if (args[0].equals("-add-server")){
                     serversPack.add();
                     save();
@@ -188,6 +212,12 @@ public class etbNode {
                 System.exit(0);
             }
         }
+        
+        else if (args.length == 2 && args[0].equals("-init")) {
+                initialise(args[1]);
+                System.exit(1);
+        }
+        
         else if (args.length == 2) {
             instantiate();
             populate();
@@ -206,7 +236,7 @@ public class etbNode {
                 }
                 try {
                     etbDatalog dlPack = new etbDatalog();
-                    dlPack.parseToDatalog(scriptFile);
+                    dlPack.parseToDatalog(scriptFile, repoDirPath);
                     etbDatalogEngine dlEngine = new etbDatalogEngine();
                     Collection<Map<String, String>> answers = dlEngine.run(this, dlPack);
                     
@@ -224,6 +254,7 @@ public class etbNode {
                     e.printStackTrace();
                 }
             }
+            
             else if (args[0].equals("-set-port")){
                 try {
                     this.port =  Integer.valueOf(args[1]);
@@ -235,6 +266,30 @@ public class etbNode {
             }
             else if (args[0].equals("-set-repo")){
                 setWorkingDirectory(args[1]);
+            }
+            else if (args[0].equals("-add-claim")){
+                claims.add(args[1], workflowsPack.getWorkflows(), repoDirPath, this);
+                save();
+            }
+            else if (args[0].equals("-rm-claim")){
+                claims.remove(args[1]);
+                save();
+            }
+            else if (args[0].equals("-add-service")){
+                services.add(args[1]);
+                save();
+            }
+            else if (args[0].equals("-rm-service")){
+                services.remove(args[1]);
+                save();
+            }
+            else if (args[0].equals("-add-workflow")){
+                workflowsPack.add(args[1]);
+                save();
+            }
+            else if (args[0].equals("-rm-workflow")){
+                workflowsPack.remove(args[1]);
+                save();
             }
             else if (args[0].equals("-update-claim")){
                 claims.update(args[1], workflowsPack.getWorkflows(), repoDirPath, this);
@@ -337,7 +392,8 @@ public class etbNode {
         if (services.containsService(serviceName)) {
             System.out.println("\t -> processing - " + serviceName + " - as a local service");
             System.out.println("\t -> service args " + serviceArgs.toString());
-            String serviceInvMode = glueCodeAutoGen.getMode(serviceArgs);
+            //String serviceInvMode = glueCodeAutoGen.getMode(serviceArgs);
+            String serviceInvMode = utils.getMode(serviceArgs);
             System.out.println("\t\t -> service invocation mode: " + serviceInvMode);
             String serviceSign = services.get(serviceName).getSignature();
             System.out.println("\t\t -> service signature: " + serviceSign);

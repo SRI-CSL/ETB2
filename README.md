@@ -57,18 +57,18 @@ A JDK is required to compile and run ETB2.
 	Usage:     etb2 [options] <inputs>
 
 	Options:
-	-help/-h          shows this help menue
+	-help/-h          shows this help menu
 	-init             initialises an etb node at a given location
 	-node-info        displays details of the node, like its port, claims, workflows, local services and available remote servers/services
 	-clean            removes available local services and remote servers from the server
-	-uninit           deletes initialisation componenets of the node
+	-uninit           deletes initialisation components of the node
 	-set-port <int>   sets <int> as the port number of the server
 	-set-repo <dir>   sets <dir> as the git repo used as working directory
 	-query <term>     runs a query to get solutions for the given term
 	-script <file>    executes a file with datalog workflow to get solutions for its queries
 	-add-service      adds local service(s) to the server
 	-rm-service       removes local service(s) from the node
-	-add-server       adds remote server(s) whose services will avilable to the etb node
+	-add-server       adds remote server(s) whose services will available to the etb node
 	-rm-server        removes remote servers
 	-add-claim        adds claim(s) to the etb node
 	-rm-claim         removes claim(s) from the etb node
@@ -83,7 +83,7 @@ A JDK is required to compile and run ETB2.
 
 	### Node initialisation
 
-	If we run the command 'etb2 -node-info' right after building and setting up ETB2, we get a notification that no ETB node is yet intialised on the our machine.   
+	If we run the command 'etb2 -node-info' right after building and setting up ETB2, we get a notification that no ETB node is yet initialised on the our machine.   
 
 	```console
 	$ etb2 -node-info

@@ -1,4 +1,3 @@
-//package etb.etbDL;
 package etb.etbDL.statements;
 
 import java.io.IOException;
@@ -10,8 +9,6 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.io.File;
 
-//import etb.etbDL.statements.*;
-//import etb.etbDL.statement.StatementFactory;
 import etb.etbDL.utils.*;
 
 /**
@@ -25,9 +22,9 @@ public class etbDLParser {
      * - a rule, like ancestor(A, B) :- ancestor(A, C), parent(C, B).
      * - a query, like ancestor(X, bob)?
      */
-    public static etbDLStatement parseStmt(StreamTokenizer scan) throws DatalogException {
+    public static etbDLStatement parseStmt(StreamTokenizer scan, String repoDirPath) throws DatalogException {
         try {
-            Expr head = parseExpr(scan);
+            Expr head = parseExpr(scan, repoDirPath);
     
             if(scan.nextToken() == ':') {// dealing with a rule
                 if(scan.nextToken() != '-') {
@@ -35,7 +32,7 @@ public class etbDLParser {
                 }
                 List<Expr> body = new ArrayList<>();
                 do { //parses each expression (pred or builtin) of the body of the rule
-                    Expr arg = parseExpr(scan);
+                    Expr arg = parseExpr(scan, repoDirPath);
                     body.add(arg);
                 } while(scan.nextToken() == ','); // body preds must be separated by comma
                 
@@ -43,6 +40,8 @@ public class etbDLParser {
                     throw new DatalogException("[line " + scan.lineno() + "] expected '.' after rule");
                 }
                 Rule newRule = new Rule(head, body);
+                //System.out.println("head ********** : " + head.toString());
+                //System.out.println("body ********** : " + body.toString());
                 return etbDLStatementFactory.getRuleStatement(newRule); //inserting to the DB
             }
             else {
@@ -62,7 +61,7 @@ public class etbDLParser {
     }
     
     // parses an expression
-    public static Expr parseExpr(StreamTokenizer scan) throws DatalogException, IOException {
+    public static Expr parseExpr(StreamTokenizer scan, String repoDirPath) throws DatalogException, IOException {
         boolean negated = false, builtInExpected = false;
         String lhs = null;
         
@@ -105,7 +104,7 @@ public class etbDLParser {
         List<String> terms = new ArrayList<>();
         if(scan.nextToken() != ')') {
             scan.pushBack();
-            terms = getPredicateTerms(scan);
+            terms = getPredicateTerms(scan, repoDirPath);
             if(scan.ttype != ')') {
                 throw new DatalogException("[line " + scan.lineno() + "] expected ')'");
             }
@@ -123,12 +122,12 @@ public class etbDLParser {
         return e;
     }
     
-    private static List<String> getPredicateTerms(StreamTokenizer scan) throws IOException, DatalogException {
+    private static List<String> getPredicateTerms(StreamTokenizer scan, String repoDirPath) throws IOException, DatalogException {
         //not builtin operator (i.e., predicate) and next scan is '('... diving into args of predicate)
         List<String> terms = new ArrayList<>();
         String signature = "", mode = "";
         do {
-            if(scan.nextToken() == StreamTokenizer.TT_WORD) {//word
+            if(scan.nextToken() == StreamTokenizer.TT_WORD) {//etb string type
                 String wordTerm = readComplexTerm(scan.sval, scan);
                 terms.add(wordTerm);
                 signature += "1";
@@ -140,10 +139,33 @@ public class etbDLParser {
             else if(scan.ttype == '"' || scan.ttype == '\'') {
                 //TODO: separate handling of single and double quotes
                 String restScan = scan.sval;
-                if (restScan.contains("/") || restScan.contains(".")) {
+                if (restScan.contains("/") || restScan.contains(".")) {//may be file?
+                    String filePath;
+                    if ((filePath = utils.getFilePathInDirectory(restScan, repoDirPath)).equals(null)) {
+                        throw new DatalogException("[line " + scan.lineno() + "] a non-valid file path " + restScan + "']'");
+                    }
+                    else {
+                        terms.add("file(" + filePath + ")");
+                        signature += "2";
+                        mode += "+";
+                    }
+                    
+                    /*
+                    File file = new File(restScan);
+                    if (file.exists()) {//TODO: a file variable with no / and .??
+                        terms.add("file(" + file.getAbsolutePath() + ")");
+                        signature += "2";
+                        mode += "+";
+                    }
+                    else {//normal variable
+                        throw new DatalogException("[line " + scan.lineno() + "] a non-valid file path " + restScan + "']'");
+                    }
+                     */
+                    /*
                     terms.add("file(" + restScan + ")");
                     signature += "2";
                     mode += "+";
+*/
                 }
                 else {
                     File file = new File(restScan);
@@ -153,12 +175,13 @@ public class etbDLParser {
                         mode += "+";
                     }
                     else {//normal variable
-                        System.out.println("a valid non-file string");//TODO: does this really happen?
+                        //System.out.println("a valid non-file string");//TODO: does this really happen?
                         signature += "1";
                         if (Character.isUpperCase(restScan.charAt(0)))
                             mode += "-";
                         else
                             mode += "+";
+                        terms.add(restScan);
                     }
                 }
             }
@@ -169,7 +192,7 @@ public class etbDLParser {
             }
             else if(scan.ttype == '[') {// a list
                 
-                List<String> listTerms = getPredicateTerms(scan);
+                List<String> listTerms = getPredicateTerms(scan, repoDirPath);
                 if(scan.ttype != ']') {
                     throw new DatalogException("[line " + scan.lineno() + "] list is expected to end with ']'");
                 }

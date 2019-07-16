@@ -10,8 +10,6 @@ import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteException;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
-//import org.json.simple.parser.JSONParser;
-//import org.json.simple.parser.ParseException;
 import org.json.XML;
 import java.util.Iterator;
 import java.util.Scanner;
@@ -43,7 +41,6 @@ public class utils {
         return Character.isUpperCase(term.charAt(0));
     }
     
-    //TODO: in utils
     public static String getSHA1(String file) {
         StringBuffer sb = new StringBuffer();
         try {
@@ -68,7 +65,6 @@ public class utils {
         return sb.toString();
     }
     
-    //TODO: in utils
     public static boolean existsInRepo(String maybeChildPath, String repoDirPath){
         File maybeChild = new File(maybeChildPath);
         File possibleParent = new File(repoDirPath);
@@ -93,29 +89,6 @@ public class utils {
         return false;
     }
 
-    /*
-    public static boolean checkFileInDirectory(String filePath, String repoDirPath) {
-        
-        Path p = Paths.get(filePath);
-        File file = new File(filePath);
-        if (p.isAbsolute()) {
-            if (file.exists()) {
-                System.out.println("file EXISTS -- an absolute path");
-                return filePath.contains(repoDirPath);
-            }
-            else {
-                System.out.println("file does NOT EXIST -- an absolute path");
-                file = new File(repoDirPath + "/"+ filePath);
-                return file.exists();
-            }
-        }
-        else {
-            System.out.println("NOT an absolute path");
-            file = new File(repoDirPath + "/"+ filePath);
-            return file.exists();
-        }
-    }
-*/
     public static String getFilePathInDirectory(String filePath, String repoDirPath) {
         
         Path p = Paths.get(filePath);
@@ -135,5 +108,15 @@ public class utils {
         }
     }
 
-
+    public static String getMode(List<String> params) {
+        
+        return String.join("", Arrays.asList(params.stream().map(param -> getMode(param)).toArray(String[]::new)));
+    }
+    
+    public static String getMode(String param) {
+        if (utils.isVariable(param))
+            return "-";
+        else
+            return "+";
+    }
 }

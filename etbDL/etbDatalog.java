@@ -20,7 +20,8 @@ public class etbDatalog {
 		scan.quoteChar('\'');
 		return scan;
 	}
-
+    
+    /*
     public void parseToDatalog(String scriptFile) throws DatalogException {
         try {
             Reader reader = new BufferedReader(new FileReader(scriptFile));
@@ -42,6 +43,29 @@ public class etbDatalog {
         }
         
     }
+    */
+    public void parseToDatalog(String scriptFile, String repoDirPath) throws DatalogException {
+        try {
+            Reader reader = new BufferedReader(new FileReader(scriptFile));
+            StreamTokenizer scan = getTokenizer(reader);
+            scan.nextToken();
+            while(scan.ttype != StreamTokenizer.TT_EOF) {
+                scan.pushBack();
+                //each line being parsed and a corresponding statement constructed
+                etbDLStatement statement = etbDLParser.parseStmt(scan, repoDirPath);
+                try {
+                    statement.addTo(this);
+                } catch (DatalogException e) {
+                    throw new DatalogException("[line " + scan.lineno() + "] Error executing statement", e);
+                }
+                scan.nextToken();
+            }
+        } catch (IOException e) {
+            throw new DatalogException(e);
+        }
+        
+    }
+    
     
     public void validate() throws DatalogException {
         for(Rule rule : intDB) {

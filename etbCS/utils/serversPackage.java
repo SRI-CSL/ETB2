@@ -49,7 +49,6 @@ public class serversPackage {
             String serverAddress = in.nextLine();
             System.out.print("--> server port : ");
             String serverPort = in.nextLine();
-            
             //communicating with the server and registering its services *** act as a client
             clientMode cm = new clientMode(serverAddress, Integer.valueOf(serverPort));
             if (cm.isConnected()) {

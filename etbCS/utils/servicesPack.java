@@ -4,15 +4,12 @@ import java.io.*;
 import java.util.*;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONArray;
-//import java.util.regex.Matcher;
-//import java.util.regex.Pattern;
-
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
 import etb.etbDL.statements.etbDLParser;
-//import etb.etbCS.etcServer;
 import etb.etbDL.services.*;
-
 import etb.etbDL.utils.*;
 import etb.etbDL.output.*;
 
@@ -51,128 +48,92 @@ public class servicesPack {
         return services.containsKey(serviceID);
     }
     
-    private boolean validSignature(ArrayList<String> signature) {
-        ArrayList<String> signSpecs = new ArrayList();
-        signSpecs.add("string");
-        signSpecs.add("file");
-        signSpecs.add("string_list");
-        signSpecs.add("file_list");
+    public void add(String specFilePath) {
         
-        for (int i=0; i < signature.size(); i++) {
-            if (!signSpecs.contains(signature.get(i))) {
-                System.out.println("--> not a valid signature entry '" + signature.get(i) + "' \u001B[31m(signature not accepted)\u001B[30m");
-                return false;
+        try {
+            JSONParser parser = new JSONParser();
+            Object serviceSpecObj = parser.parse(new FileReader(specFilePath));
+            JSONObject serviceSpecJSON = (JSONObject) serviceSpecObj;
+            
+            String ID = (String) serviceSpecJSON.get("ID");
+            if ((ID = ID.trim()) == null) {
+                System.out.println("=> no service ID given \u001B[31m(operation not successful)\u001B[30m");
+                return;
             }
+            else if (services.containsKey(ID)) {
+                System.out.println("=> a service with ID '" + ID + "' exists \u001B[31m(operation not successful)\u001B[30m");
+                return;
+             }
+            
+            String signature, signature0 = (String) serviceSpecJSON.get("signature");
+            if (signature0 == null) {
+                System.out.println("=> no service signature given \u001B[31m(operation not successful)\u001B[30m");
+                return;
+            }
+            else if ((signature = encodeSignature(signature0)) == null) {
+                System.out.println("=> invalid service signature given \u001B[31m(operation not successful)\u001B[30m");
+                return;
+            }
+            
+            String modesStr = (String) serviceSpecJSON.get("modes");
+            if (modesStr == null) {
+                System.out.println("=> no service modes given \u001B[31m(operation not successful)\u001B[30m");
+                return;
+            }
+            List<String> modes = Arrays.asList(modesStr.split("\\s+"));
+            
+            serviceSpec toAdd = new serviceSpec(ID, signature, modes);
+            toAdd.generateWrappers();
+            services.put(ID, toAdd);
+            
+            updateExternPredBridgeFile();
+            
+            System.out.println("=> service added successfully");
+            
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ParseException e) {
+            e.printStackTrace();
         }
-        return true;
+        
+    }
+    
+    private String encodeSignature(String signature){
+        List<String> signList = Arrays.asList(signature.split("\\s+"));
+        Map<String, String> typesEncodeMap = new HashMap<String, String>();
+        typesEncodeMap.put("string", "1");
+        typesEncodeMap.put("file", "2");
+        typesEncodeMap.put("string_list", "3");
+        typesEncodeMap.put("file_list", "4");
+        
+        if (typesEncodeMap.keySet().containsAll(signList)) {
+            return String.join("", Arrays.asList(signList.stream().map(inType -> typesEncodeMap.get(inType)).toArray(String[]::new)));
+        }
+        return null;
     }
 
-    private String toSignatureCode(ArrayList<String> signature) {
-        String encodSignStr = "";
-        for (int i=0; i < signature.size(); i++) {
-            
-            switch(signature.get(i)){
-                case "string":
-                    encodSignStr += "1";
-                    break;
-                case "file":
-                    encodSignStr += "2";
-                    break;
-                case "string_list":
-                    encodSignStr += "3";
-                    break;
-                case "file_list":
-                    encodSignStr += "4";
-                    break;
-                default:
-                    System.out.println("unknown type '" + signature.get(i) + "'");
-                    return null;
-            }
+    public void remove(String ID) {
+        if (!services.keySet().contains(ID)) {
+            System.out.println("=> a service with the name '" + ID + "' does not exist \u001B[31m(removal not successful)\u001B[30m");
+            return;
         }
-        return encodSignStr;
-    }
-
-    public void add() {
-        
-        while (true) {
-            Scanner in = new Scanner(System.in);
-            System.out.print("--> service name : ");
-            String serviceName = in.nextLine();
-            
-            if (services.containsKey(serviceName)) {
-                System.out.println("=> a tool with the name '" + serviceName + "' exists \u001B[31m(operation not successful)\u001B[30m");
-                System.out.print("=> add more tools? [y] to add more : ");
-                if (!in.nextLine().equals("y"))
-                    break;
-                continue;
-            }
-            
-            String signatureStr;
-            ArrayList<String> signature = new ArrayList();
-            do {
-                System.out.print("--> service signature : ");
-                signatureStr = in.nextLine();
-                signature = new ArrayList(Arrays.asList(signatureStr.split(" "))); //TODO: better signature specification
-            } while (!validSignature(signature));
-            
-            System.out.print("--> number of invocation modes : ");
-            String modesCount = in.nextLine();
-            System.out.print("--> set of modes : ");
-            String toolExecModes = in.nextLine();
-            
-            ArrayList<String> modeSet = glueCodeAutoGen.addToolWrapper(serviceName, signature, Integer.parseInt(modesCount), toolExecModes);
-            services.put(serviceName, new serviceSpec(toSignatureCode(signature), modeSet));
-            
-            System.out.println("=> tool added successfully");
-            System.out.print("=> add more tools? [y] to add more : ");
-            if (!in.nextLine().equals("y"))
-                break;
-        }
-
-        ArrayList<String> etcServiceNames = new ArrayList();
-        etcServiceNames.addAll(services.keySet());
-        glueCodeAutoGen.updateExternPredBridgeFile(etcServiceNames);
-        //save();
-    }
-
-    public void remove() {
-        
-        while (true) {
-            Scanner in = new Scanner(System.in);
-            System.out.print("--> service name : ");
-            String toolName = in.nextLine();
-            
-            //checking if workflow already exists with the same name
-            if (!services.keySet().contains(toolName)) {
-                System.out.println("=> a service with the name '" + toolName + "' does not exist \u001B[31m(removal not successful)\u001B[30m");
-                System.out.print("=> remove more tools? [y] to remove more : ");
-                if (!in.nextLine().equals("y"))
-                    break;
-                continue;
-            }
-            services.remove(toolName);
-            glueCodeAutoGen.removeToolWrapper(toolName);
-            System.out.println("=> tool removed successfully");
-            System.out.print("=> remove more tools? [y] to remove more : ");
-            if (!in.nextLine().equals("y"))
-                break;
-        }
-        ArrayList<String> etcServiceNames = new ArrayList();
-        etcServiceNames.addAll(services.keySet());
-        glueCodeAutoGen.updateExternPredBridgeFile(etcServiceNames);
-        //save();
+        services.remove(ID);
+        removeWrappers(ID);
+        System.out.println("=> service removed successfully");
+        updateExternPredBridgeFile();
     }
 
     public String getNames() {
         if (services.isEmpty()) {
             return null;
         }
+        /*
         Iterator<String> nameIter = services.keySet().iterator();
         String namesStr = nameIter.next();
         while (nameIter.hasNext()) {
             namesStr += " " + nameIter.next();
-        }
-        return namesStr;
+        }*/
+        return String.join(" ", services.keySet());
     }
     
     public void print() {
@@ -188,5 +149,79 @@ public class servicesPack {
         return services.get(serviceID);
     }
     
+    private void updateExternPredBridgeFile() {
+        
+        if (services.size() == 0) {
+            generateDefaultBridgeFile();
+            return;
+        }
+        
+        String filePath = System.getProperty("user.dir") + "/etbDL/services/externPred2ServiceInstance.java";
+        try {
+            FileWriter NewFileFW = new FileWriter(filePath);
+            NewFileFW.write("/*\n implements a mechanism for translating external predicates to corresponding tool invocation (auto-generated code)\n*/");
+            NewFileFW.write("\n\npackage etb.etbDL.services;");
+            NewFileFW.write("\nimport java.util.ArrayList;");
+            NewFileFW.write("\nimport etb.wrappers.*;");
+            NewFileFW.write("\n\npublic class externPred2ServiceInstance extends externPred2Service {");
+            NewFileFW.write("\n\t@Override");
+            NewFileFW.write("\n\tpublic genericWRP getGroundParams(String toolName, ArrayList<String> args, String mode) {");
+            NewFileFW.write("\n\t\tgenericWRP genWRP = null;");
+            
+            Iterator<String> it = services.keySet().iterator();
+            String toolName = it.next();
+            NewFileFW.write("\n\t\tif(toolName.equals(\"" + toolName + "\")){");
+            NewFileFW.write("\n\t\t\tgenWRP = new " + toolName + "WRP();");
+            NewFileFW.write("\n\t\t}");
+            
+            while(it.hasNext()) {
+                toolName = it.next();
+                NewFileFW.write("\n\t\telse if(toolName.equals(\"" + toolName + "\")){");
+                NewFileFW.write("\n\t\t\tgenWRP = new " + toolName + "WRP();");
+                NewFileFW.write("\n\t\t}");
+            }
+            
+            NewFileFW.write("\n\t\telse{");
+            NewFileFW.write("\n\t\t\tSystem.out.println(\"no external service found with name: \" + toolName);");
+            NewFileFW.write("\n\t\t}");
+            NewFileFW.write("\n\t\treturn genWRP;");
+            NewFileFW.write("\n\t}");
+            NewFileFW.write("\n}");
+            NewFileFW.flush();
+            NewFileFW.close();
+            
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        utils.runCMD0("cd " + System.getProperty("user.dir") + " && javac -d .  etbDL/services/externPred2ServiceInstance.java");
+    }
+    
+    public void generateDefaultBridgeFile() {
+        String filePath = System.getProperty("user.dir") + "/etbDL/services/externPred2ServiceInstance.java";
+        try {
+            FileWriter NewFileFW = new FileWriter(filePath);
+            NewFileFW.write("/*\n implements a mechanism for translating external predicates to corresponding tool invocation (auto-generated code)\n*/");
+            NewFileFW.write("\n\npackage etb.etbDL.services;");
+            NewFileFW.write("\nimport java.util.ArrayList;");
+            NewFileFW.write("\n\npublic class externPred2ServiceInstance extends externPred2Service {");
+            NewFileFW.write("\n\t@Override");
+            NewFileFW.write("\n\tpublic genericWRP getGroundParams(String toolName, ArrayList<String> args, String mode) {");
+            NewFileFW.write("\n\n\t\treturn null;");
+            NewFileFW.write("\n\t}");
+            NewFileFW.write("\n}");
+            NewFileFW.flush();
+            NewFileFW.close();
+            
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        utils.runCMD0("cd " + System.getProperty("user.dir") + " && javac -d .  etbDL/services/externPred2ServiceInstance.java");
+    }
+
+    private void removeWrappers(String serviceID) {
+        utils.runCMD0("cd " + System.getProperty("user.dir") + "/wrappers/ && rm -f " + serviceID + "WRP.java " + serviceID + "ETBWRP.java");
+        utils.runCMD0("cd " + System.getProperty("user.dir") + "/etb/wrappers/ && rm -f " + serviceID + "WRP.class " + serviceID + "ETBWRP.class");
+    }
+
 }
 

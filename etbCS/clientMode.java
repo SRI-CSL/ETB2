@@ -3,12 +3,10 @@ package etb.etbCS;
 import java.util.*;
 import java.net.*;
 import java.io.*;
-
 import etb.etbCS.utils.*;
 import etb.etbDL.utils.*;
 import etb.etbDL.services.*;
 import etb.etbDL.output.*;
-
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -48,7 +46,8 @@ public class clientMode {
             //sending service server for execution
             toServerData.writeUTF(serviceName); //service name
             //sending the mode -- to know if service is defined for the mode
-            String serviceInvMode = glueCodeAutoGen.getMode(serviceArgs); //TODO: move to utils **** from the glueCodeAutoGen
+            //String serviceInvMode = glueCodeAutoGen.getMode(serviceArgs); //TODO: move to utils **** from the glueCodeAutoGen
+            String serviceInvMode = utils.getMode(serviceArgs); //TODO: move to utils **** from the glueCodeAutoGen
             toServerData.writeUTF(serviceInvMode);
             
             //sending service args to server
@@ -312,5 +311,5 @@ public class clientMode {
         
         return fileName;
     }
-
+    
 }

@@ -3,7 +3,6 @@ package etb.etbCS.utils;
 import java.util.*;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONArray;
-
 import etb.etbDL.utils.*;
 
 public class workFlowSpec {
@@ -19,15 +18,13 @@ public class workFlowSpec {
     }
 
     public workFlowSpec(JSONObject workFlowSpecJSON) {
-        
         this.ID = (String) workFlowSpecJSON.get("ID");
-        JSONArray queryListJSON = (JSONArray) workFlowSpecJSON.get("queryList");
+        JSONArray queryListJSON = (JSONArray) workFlowSpecJSON.get("queries");
         for (int i = 0; i < queryListJSON.size(); i++) {
-            JSONObject queryJSON = (JSONObject) queryListJSON.get(i);
-            String queryPred = (String) queryJSON.get("pred");
-            this.queryList.put(queryPred, new querySpec(queryJSON));
+            querySpec qSpec = new querySpec((JSONObject) queryListJSON.get(i));
+            this.queryList.put(qSpec.getID(), qSpec);
         }
-        this.scriptPath = (String) workFlowSpecJSON.get("scriptPath");
+        this.scriptPath = (String) workFlowSpecJSON.get("script");
     }
 
     public String getScriptPath() {
@@ -35,51 +32,28 @@ public class workFlowSpec {
     }
     
     public JSONObject toJSONObject() {
-        
         JSONObject NewObj = new JSONObject();
-        
         NewObj.put("ID", ID);
-        
         JSONArray queryListJSON = new JSONArray();
         for (String queryPred : queryList.keySet()) {
             queryListJSON.add(queryList.get(queryPred).toJSONObj(queryPred));
         }
-        NewObj.put("queryList", queryListJSON);
-        NewObj.put("scriptPath", scriptPath);
-        
+        NewObj.put("queries", queryListJSON);
+        NewObj.put("script", scriptPath);
         return NewObj;
-        
     }
-    
-    public void print(String indent, String repoDirPath) {
-        System.out.println(indent + "ID : " + ID);
-        System.out.println(indent + "scriptPath : " + scriptPath);
-        System.out.println(indent + "queryList: " + queryList.toString());
-    }
-    
     
     public void print() {
-        //System.out.println("--> ID: " + ID);
+        System.out.println("--> ID: " + ID);
         System.out.println("--> scriptPath: " + scriptPath);
         System.out.println("--> queryList: " + queryList.toString());
     }
-    
-    
+
     public boolean containsQuery(Expr query) {
-        if (this.queryList.containsKey(query.getPredicate())) {
-            querySpec qSpec = this.queryList.get(query.getPredicate());
-            if (qSpec.getMode().equals(query.getMode())) {
-                for (int i=0; i<query.getMode().length(); i++) {
-                    if (query.getMode().charAt(i) == '+' && qSpec.getSignature().charAt(i) != query.getSignature().charAt(i))
-                        return false;
-                }
-                return true;
-            }
-            //return false;
-        }
-        return false;
+        return (this.queryList.containsKey(query.getPredicate()) &&
+                this.queryList.get(query.getPredicate()).equals(query));
     }
-    
+
     public String getSHA1(String repoDirPath) {
         return utils.getSHA1(utils.getFilePathInDirectory(scriptPath, repoDirPath));
     }
