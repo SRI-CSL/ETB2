@@ -1,4 +1,4 @@
-   package etb.etbCS;
+package etb.etbCS;
 
 import java.util.*;
 import org.json.simple.JSONArray;
@@ -23,12 +23,13 @@ public class etbNode {
     
     String hostIP = "127.0.0.1";
     int port = 0;
-    String repoDirPath = System.getProperty("user.dir");
-
-    servicesPack services;
+    String repoDirPath = System.getProperty("user.dir"); //gitRepo
+    
     serversPackage serversPack;
+    servicePackage servicePack;
     workFlowsPackage workflowsPack;
     claimsPack claims;
+    
     String paramsFilePath = System.getProperty("user.dir") + "/params.json";
     JSONObject nodeParamsJSONObj = new JSONObject();
     
@@ -40,10 +41,22 @@ public class etbNode {
             System.exit(1);
         }
         
-        services = new servicesPack();
+        servicePack = new servicePackage();
         serversPack = new serversPackage();
         workflowsPack = new workFlowsPackage();
         claims = new claimsPack();
+    }
+    
+    public serversPackage getServersPack() {
+        return serversPack;
+    }
+    
+    public String getRepoDirPath() {
+        return repoDirPath;
+    }
+    
+    public servicePackage getServicePack() {
+        return servicePack;
     }
     
     private void initialise() {
@@ -141,7 +154,6 @@ public class etbNode {
         
     }
     
-    
     private void instantiate() {
         try {
             JSONParser parser = new JSONParser();
@@ -160,7 +172,7 @@ public class etbNode {
 
     private void populate() {
         
-        services = new servicesPack((JSONArray) nodeParamsJSONObj.get("services"));
+        servicePack = new servicePackage((JSONArray) nodeParamsJSONObj.get("servicePack"));
         serversPack = new serversPackage((JSONArray) nodeParamsJSONObj.get("servers"));
         workflowsPack = new workFlowsPackage(repoDirPath, (JSONArray) nodeParamsJSONObj.get("workflows"));
         claims = new claimsPack((JSONArray) nodeParamsJSONObj.get("claims"));
@@ -175,12 +187,12 @@ public class etbNode {
             }
             else if (args[0].equals("-uninit")) {
                 utils.runCMD0("rm -f etb/wrappers/* wrappers/* " + paramsFilePath);
-                services.generateDefaultBridgeFile();
+                servicePack.generateDefaultBridgeFile();
                 System.exit(1);
             }
             else if (args[0].equals("-clean")) {
                 utils.runCMD0("rm -f etb/wrappers/* wrappers/*");
-                services.generateDefaultBridgeFile();
+                servicePack.generateDefaultBridgeFile();
                 instantiate();
                 save();
                 System.exit(1);
@@ -193,10 +205,10 @@ public class etbNode {
                 instantiate();
                 populate();
                 if (args[0].equals("-node-info")){
-                    print();
+                    System.out.println(this);
                 }
                 else if (args[0].equals("-claims-status")){
-                    claims.checkStatus(workflowsPack.getWorkflows(), repoDirPath);
+                    claims.checkStatus(servicePack, workflowsPack.getWorkflows(), repoDirPath);
                 }
                 else if (args[0].equals("-add-server")){
                     serversPack.add();
@@ -222,36 +234,29 @@ public class etbNode {
             instantiate();
             populate();
             if (args[0].equals("-query")){
+                //directly processing a query
                 List<String> serviceArgs = inQuery2Params(args[1]);
                 String serviceName = serviceArgs.remove(0);
-                //System.out.println("serviceName : " + serviceName);
-                //System.out.println("serviceArgs : " + serviceArgs.toString());
-                processQuery(serviceName, serviceArgs);
+                serviceInvocation inv = new serviceInvocation(new Expr(serviceName, serviceArgs));
+                inv.process(this);
             }
+            //TODO: claims already from queries in the script?
             else if (args[0].equals("-script")){
                 String scriptFile = args[1];
                 File SourceFileObj = new File(args[1]);
                 if (!SourceFileObj.exists()) {
                     System.out.println("error: problem with the script file!");
                 }
-                try {
-                    etbDatalog dlPack = new etbDatalog();
-                    dlPack.parseToDatalog(scriptFile, repoDirPath);
-                    etbDatalogEngine dlEngine = new etbDatalogEngine();
-                    Collection<Map<String, String>> answers = dlEngine.run(this, dlPack);
-                    
-                    System.out.println(dlPack.getGoal().toString());
-                    if (answers == null) {
-                        System.out.println("=> no claim for the query (null binding found)");
-                    }
-                    else {
-                        //if (answers != null) {
-                        //System.out.println(dlPack.getGoal().toString());
-                        QueryOutput qo = new DefaultQueryOutput();
-                        qo.writeResult2(answers);
-                    }
-                } catch (DatalogException e) {
-                    e.printStackTrace();
+                etbDatalog dlPack = new etbDatalog();
+                dlPack.parseDatalogScript(scriptFile, repoDirPath);
+                etbDatalogEngine dlEngine = new etbDatalogEngine();
+                Collection<Map<String, String>> answers = dlEngine.run(this, dlPack);
+                if (answers == null) {
+                    System.out.println("=> no claim for the query (null binding found)");
+                }
+                else {
+                    QueryOutput qo = new DefaultQueryOutput();
+                    qo.writeResult2(answers);
                 }
             }
             
@@ -268,19 +273,19 @@ public class etbNode {
                 setWorkingDirectory(args[1]);
             }
             else if (args[0].equals("-add-claim")){
-                claims.add(args[1], workflowsPack.getWorkflows(), repoDirPath, this);
+                claims.add(args[1], servicePack.getServices(), workflowsPack, repoDirPath, this);
                 save();
             }
             else if (args[0].equals("-rm-claim")){
-                claims.remove(args[1]);
+                claims.remove(Integer.parseInt(args[1]));
                 save();
             }
             else if (args[0].equals("-add-service")){
-                services.add(args[1]);
+                servicePack.add(args[1]);
                 save();
             }
             else if (args[0].equals("-rm-service")){
-                services.remove(args[1]);
+                servicePack.remove(args[1]);
                 save();
             }
             else if (args[0].equals("-add-workflow")){
@@ -292,15 +297,17 @@ public class etbNode {
                 save();
             }
             else if (args[0].equals("-update-claim")){
-                claims.update(args[1], workflowsPack.getWorkflows(), repoDirPath, this);
+                claims.update(Integer.parseInt(args[1]), servicePack, this);
                 save();
             }
-            else if (args[0].equals("-upgrade-claim")){
-                claims.upgrade(args[1], workflowsPack.getWorkflows(), repoDirPath, this);
-                save();
+            else {
+                System.out.println("ERROR. Unknown option: " + args[0]);
             }
-            else if (args[0].equals("-reconst-claim")){
-                claims.recreate(args[1], workflowsPack.getWorkflows(), repoDirPath, this);
+        }
+        
+        else if (args.length == 3) {
+            if (args[0].equals("-update-service")){
+                servicePack.update(args[1], args[2]);
                 save();
             }
             else {
@@ -356,14 +363,16 @@ public class etbNode {
         System.out.println("-reconst-claim    reconstructs an outdated claim\n");
     }
     
-    private void print() {
-        System.out.println("hostIP : " + hostIP);
-        System.out.println("port : " + port);
-        System.out.println("git repo path : " + repoDirPath);
-        claims.print();
-        workflowsPack.print();
-        services.print();
-        serversPack.print();
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[hostIP: " + hostIP + " -- port: " + port + "]");
+        sb.append("\n==> git repo path : " + repoDirPath);
+        sb.append(claims);
+        sb.append(workflowsPack);
+        sb.append(servicePack);
+        sb.append(serversPack);
+        return sb.toString();
     }
     
     private void save() {
@@ -371,7 +380,7 @@ public class etbNode {
         JSONObject NewObj = new JSONObject();
         NewObj.put("port", this.port);
         NewObj.put("repoDirPath", this.repoDirPath);
-        NewObj.put("services", services.toJSONObject());
+        NewObj.put("servicePack", servicePack.toJSONObject());
         NewObj.put("servers", serversPack.toJSONObject());
         NewObj.put("workflows", workflowsPack.toJSONObject());
         NewObj.put("claims", claims.toJSONObject());
@@ -387,93 +396,6 @@ public class etbNode {
         }
     }
     
-    public queryResult processQuery(String serviceName, List<String> serviceArgs) {
-        Expr queryExpr = new Expr(serviceName, serviceArgs);
-        if (services.containsService(serviceName)) {
-            System.out.println("\t -> processing - " + serviceName + " - as a local service");
-            System.out.println("\t -> service args " + serviceArgs.toString());
-            //String serviceInvMode = glueCodeAutoGen.getMode(serviceArgs);
-            String serviceInvMode = utils.getMode(serviceArgs);
-            System.out.println("\t\t -> service invocation mode: " + serviceInvMode);
-            String serviceSign = services.get(serviceName).getSignature();
-            System.out.println("\t\t -> service signature: " + serviceSign);
-            
-            Iterator<String> argsIter = serviceArgs.iterator();
-            ArrayList<String> serviceArgs2 = new ArrayList();
-            while (argsIter.hasNext()) {
-                serviceArgs2.add(argsIter.next());
-            }
-            
-            externPred2Service extService = new externPred2ServiceInstance();
-            Expr retQueryExpr = extService.invoke(serviceName, serviceArgs2, serviceInvMode, serviceSign);
-            
-            if (retQueryExpr == null) {
-                System.out.println("\t\t ->\u001B[31m [warning]\u001B[30m service could not be executed (please check previous error logs)");
-                return new queryResult(queryExpr, null);
-            }
-
-            System.out.println("\t\t -> service invocation result: " + retQueryExpr.toString());
-            Map<String, String> locBindings = new HashMap();
-            retQueryExpr.unify(queryExpr, locBindings);
-            System.out.println("\t\t -> bindings: " + OutputUtils.bindingsToString(locBindings));
-            if (extService.getEvidence() == null) {
-                System.out.println("\t\t ->\u001B[31m [warning]\u001B[30m no evidence (please check the wrapper)");
-            }
-            else {
-                System.out.println("\t\t -> evidence: " + extService.getEvidence());
-            }
-            return new queryResult(retQueryExpr, extService.getEvidence(), locBindings);
-        }
-        else {
-            //getting all servers providing the service requested in the query
-            Collection<serverSpec> usefulServerSpec = serversPack.getServers().values().stream().filter(eachServerSpec -> eachServerSpec.getServices().contains(serviceName)).collect(Collectors.toSet());
-            if (usefulServerSpec.isEmpty()) {
-                return new queryResult();
-            }
-            //TODO: trying to get the service from the first available server *** special tactic/heuristic needed?
-            Iterator<serverSpec> eachServerIter = usefulServerSpec.iterator();
-            while (eachServerIter.hasNext()) {
-                serverSpec eachServer = eachServerIter.next();
-                System.out.println("\t -> processing - " + serviceName + " - as a remote service");
-                System.out.println("\t -> service args " + serviceArgs.toString());
-                eachServer.print("\t\t -> ");
-                
-                clientMode cm = new clientMode(eachServer.getAddress(),eachServer.getPort());
-                if (cm.isConnected()) {
-                  return cm.remoteServiceExecution(serviceName, serviceArgs, repoDirPath);
-                }
-            }
-            return new queryResult();
-        }
-    }
-    
-    //server mode
-    public static String getFileOLD(String fileName, DataInputStream fromClientData) throws IOException {
-        //needs to check first if claim already exists in the server
-        //then the computation follows
-        String tempDirPath = "TEMP";
-        File tempDir = new File(tempDirPath);
-        if (!tempDir.isDirectory()) {
-            tempDir.mkdir();
-            fileName = "TEMP/temp_1_" + fileName;
-        }
-        else {
-            fileName = "TEMP/temp_" + (new File("TEMP").list().length + 1) + "_" + fileName;
-        }
-        File fout = new File(fileName);
-        FileOutputStream fos = new FileOutputStream(fout);
-        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
-        
-        String line;
-        while(!(line = fromClientData.readUTF()).equals("EOF")) {
-            bw.write(line);
-            bw.newLine();
-        }
-        bw.close();
-        fos.close();
-        return fileName;
-    }
-
     public static String getFile(String claimWorkingDir, String fileName, DataInputStream fromClientData) throws IOException {
         //needs to check first if claim already exists in the server
         //then the computation follows
@@ -498,7 +420,7 @@ public class etbNode {
         instantiate();
         populate();
         while (true) {
-            print();
+            System.out.println(this);
             System.out.println("waiting for a client ...");
             try (
                  ServerSocket serverSocket = new ServerSocket(this.port);
@@ -508,7 +430,7 @@ public class etbNode {
                  DataInputStream fromClientData = new DataInputStream(inStr);
                  OutputStream outStr = clientSocket.getOutputStream();
                  DataOutputStream toClientData = new DataOutputStream(outStr);
-
+                 
                  ) {
                 System.out.println("connected to client : " + clientSocket.getInetAddress().getHostAddress());
                 String request;
@@ -521,39 +443,40 @@ public class etbNode {
                     System.out.println("request being processed ... ");
                     //TODO: --> announce all the services I provide
                     System.out.println("request procssing done");
-                    toClientData.writeUTF(services.getNames());
+                    toClientData.writeUTF(servicePack.getNames());
                 }
                 
                 else if (request.equals("execReqst")){
-                    System.out.println("request received for service execution");
+                    System.out.println("=> request received for service execution");
 
                     //reading service details from client
                     String serviceName = fromClientData.readUTF();
-                    System.out.println("serviceName : " + serviceName);
+                    System.out.println("-> serviceName : " + serviceName);
                     String serviceInvMode = fromClientData.readUTF();
-                    System.out.println("serviceInvMode : " + serviceInvMode);
+                    System.out.println("-> serviceInvMode : " + serviceInvMode);
 
                     //reading service args from client
                     List<String> serviceArgs = getArgsFromClient(fromClientData, toClientData);
-                    System.out.println("serviceArgs : " + serviceArgs.toString());
+                    System.out.println("-> serviceArgs : " + serviceArgs.toString());
                     
-                    queryResult qr = processQuery(serviceName, serviceArgs);
-                    System.out.println("service execution done");
-
+                    serviceInvocation inv = new serviceInvocation(new Expr(serviceName, serviceArgs));
+                    inv.process(this);
+                    System.out.println("-> service execution done");
+                    
                     //sending back result
-                    System.out.println("execution result: " + qr.getResultExpr().toString());
-                    List<String> resultArgs = qr.getResultExpr().getTerms();
+                    System.out.println("-> execution result: " + inv.getResult());
+                    List<String> resultArgs = inv.getResult().getTerms();
+
                     Iterator<String> resultIter = resultArgs.iterator();
                     while (resultIter.hasNext()) {
                         toClientData.writeUTF(resultIter.next());
                     }
                     toClientData.writeUTF("done");
-                    toClientData.writeUTF(qr.getEvidence());
-                    
-                    //claimSpec newClaim = new claimSpec(new Expr(serviceName, serviceArgs));
-                    claimSpec newClaim = new claimSpec(qr.getResultExpr());
+                    toClientData.writeUTF(inv.getEvidence());
+
+                    claimSpec newClaim = new claimSpec(inv.getResult());
                     newClaim.generateSHA1(repoDirPath);
-                    newClaim.addAnswer(qr.getBindings());
+                    //newClaim.addAnswer(inv.getBindings());
                     claims.add(newClaim);
                     
                     save();
@@ -611,7 +534,6 @@ public class etbNode {
                             System.out.println("\t\t -> SHA1 does not match");
                             toClientData.writeUTF("sendMeCopy");
                             File eachFile = new File(eachFilePath);
-                            //eachFilePath = getFile(eachFile.getName(), fromClientData);
                             eachFilePath = getFile(claimWorkingDirPath, eachFile.getName(), fromClientData);
                         }
                     }
@@ -619,7 +541,6 @@ public class etbNode {
                         System.out.println("\t\t -> file NOT in server repo");
                         toClientData.writeUTF("sendMeCopy");
                         File eachFile = new File(eachFilePath);
-                        //eachFilePath = getFile(eachFile.getName(), fromClientData);
                         eachFilePath = getFile(claimWorkingDirPath, eachFile.getName(), fromClientData);
                     }
                     listRead += " file(" + eachFilePath + ")";

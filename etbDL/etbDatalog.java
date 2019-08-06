@@ -1,6 +1,7 @@
 package etb.etbDL;
 
 import java.io.*;
+import java.util.List;
 import java.util.ArrayList;
 import java.util.Collection;
 import etb.etbDL.statements.*;
@@ -8,10 +9,20 @@ import etb.etbDL.utils.*;
 
 public class etbDatalog {
 
-    Expr goal;
     Collection<Rule> intDB = new ArrayList<>();
     extDataBaseSuit extDB = new extDataBaseSuit();
     
+    public etbDatalog() {
+        
+    }
+
+    public etbDatalog(List<Rule> rules, List<Expr> facts) {
+        for(Rule rule : rules)
+            addRule(rule);
+        for(Expr fact : facts)
+            addFact(fact);
+    }
+
     private static StreamTokenizer getTokenizer(Reader reader) throws IOException {
 		StreamTokenizer scan = new StreamTokenizer(reader);
 		scan.ordinaryChar('.'); // assumed number by default
@@ -21,8 +32,7 @@ public class etbDatalog {
 		return scan;
 	}
     
-    /*
-    public void parseToDatalog(String scriptFile) throws DatalogException {
+    public void parseDatalogScript(String scriptFile, String repoDirPath) {
         try {
             Reader reader = new BufferedReader(new FileReader(scriptFile));
             StreamTokenizer scan = getTokenizer(reader);
@@ -30,43 +40,20 @@ public class etbDatalog {
             while(scan.ttype != StreamTokenizer.TT_EOF) {
                 scan.pushBack();
                 //each line being parsed and a corresponding statement constructed
-                etbDLStatement statement = etbDLParser.parseStmt(scan);
                 try {
+                    etbDLStatement statement = etbDLParser.parseStmt(scan, repoDirPath);
                     statement.addTo(this);
                 } catch (DatalogException e) {
-                    throw new DatalogException("[line " + scan.lineno() + "] Error executing statement", e);
+                    System.out.println("[line " + scan.lineno() + "] Error executing statement");
+                    e.printStackTrace();
                 }
                 scan.nextToken();
             }
         } catch (IOException e) {
-            throw new DatalogException(e);
+            e.printStackTrace();
         }
-        
     }
-    */
-    public void parseToDatalog(String scriptFile, String repoDirPath) throws DatalogException {
-        try {
-            Reader reader = new BufferedReader(new FileReader(scriptFile));
-            StreamTokenizer scan = getTokenizer(reader);
-            scan.nextToken();
-            while(scan.ttype != StreamTokenizer.TT_EOF) {
-                scan.pushBack();
-                //each line being parsed and a corresponding statement constructed
-                etbDLStatement statement = etbDLParser.parseStmt(scan, repoDirPath);
-                try {
-                    statement.addTo(this);
-                } catch (DatalogException e) {
-                    throw new DatalogException("[line " + scan.lineno() + "] Error executing statement", e);
-                }
-                scan.nextToken();
-            }
-        } catch (IOException e) {
-            throw new DatalogException(e);
-        }
-        
-    }
-    
-    
+
     public void validate() throws DatalogException {
         for(Rule rule : intDB) {
             rule.validate();
@@ -76,21 +63,25 @@ public class etbDatalog {
 		}
     }
     
-    public void setGoal(Expr goal) {
-        this.goal = goal;
-    }
-    
-    public void addRule(Rule newRule) throws DatalogException {
-        newRule.validate();
-        intDB.add(newRule);
+    public void addRule(Rule newRule) {
+        try {
+            newRule.validate();
+            intDB.add(newRule);
+        } catch (DatalogException e) {
+            e.printStackTrace();
+        }
     }
 
-    public void addFact(Expr newFact) throws DatalogException {
+    public void addFact(Expr newFact) {
         if(!newFact.isGround()) {
-            throw new DatalogException("Facts must be ground: " + newFact);
+            //throw new DatalogException("Facts must be ground: " + newFact);
+            DatalogException e = new DatalogException("Facts must be ground: " + newFact);
+            e.printStackTrace();
         }
         if(newFact.isNegated()) {
-            throw new DatalogException("Facts cannot be negated: " + newFact);
+            //throw new DatalogException("Facts cannot be negated: " + newFact);
+            DatalogException e = new DatalogException("Facts cannot be negated: " + newFact);
+            e.printStackTrace();
         }
         //TODO: matching arity against existing facts
         extDB.add(newFact);
@@ -148,10 +139,6 @@ public class etbDatalog {
     
     public Collection<Rule> getIntDB() {
         return intDB;
-    }
-    
-    public Expr getGoal() {
-        return goal;
     }
     
 }

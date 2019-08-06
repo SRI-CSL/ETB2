@@ -13,29 +13,24 @@ import etb.etbDL.services.*;
 import etb.etbDL.utils.*;
 import etb.etbDL.output.*;
 
-public class servicesPack {
+public class servicePackage {
     
     Map<String, serviceSpec> services = new HashMap();
 
-    public servicesPack() {
-        services = new HashMap();
-    }
-    
-    public servicesPack(JSONArray servicesJSON) {
-        if (servicesJSON == null) {
-            System.out.println("\u001B[31m(null services)\u001B[30m");
-        }
+    public servicePackage() {}
+
+    public servicePackage(JSONArray servicesJSON) {
         Iterator<JSONObject> serviceIter = servicesJSON.iterator();
         while (serviceIter.hasNext()) {
-            JSONObject serviceSpecObj = (JSONObject) serviceIter.next();
-            this.services.put((String) serviceSpecObj.get("ID"), new serviceSpec(serviceSpecObj));
+            serviceSpec service = new serviceSpec((JSONObject) serviceIter.next());
+            this.services.put(service.getID(), service);
         }
     }
     
     public JSONArray toJSONObject() {
         JSONArray servicesJSON = new JSONArray();
         for (String serviceID : services.keySet()) {
-            servicesJSON.add(services.get(serviceID).toJSONObject(serviceID));
+            servicesJSON.add(services.get(serviceID).toJSONObject());
         }
         return servicesJSON;
     }
@@ -49,7 +44,6 @@ public class servicesPack {
     }
     
     public void add(String specFilePath) {
-        
         try {
             JSONParser parser = new JSONParser();
             Object serviceSpecObj = parser.parse(new FileReader(specFilePath));
@@ -127,22 +121,19 @@ public class servicesPack {
         if (services.isEmpty()) {
             return null;
         }
-        /*
-        Iterator<String> nameIter = services.keySet().iterator();
-        String namesStr = nameIter.next();
-        while (nameIter.hasNext()) {
-            namesStr += " " + nameIter.next();
-        }*/
         return String.join(" ", services.keySet());
     }
     
-    public void print() {
-        System.out.println("==> total number of local services: " + services.size());
-        int count = 1;
-        for (String serviceID : services.keySet()) {
-            System.out.println("==> [service " + count++ + "] ID : " + serviceID);
-            services.get(serviceID).print();
-        }
+    public Map<String, serviceSpec> getServices() {
+        return services;
+    }
+    
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n==> total number of local services: " + services.size());
+        services.keySet().stream().forEach(serviceID -> sb.append(services.get(serviceID)));
+        return sb.toString();
     }
     
     public serviceSpec get(String serviceID) {
@@ -159,13 +150,14 @@ public class servicesPack {
         String filePath = System.getProperty("user.dir") + "/etbDL/services/externPred2ServiceInstance.java";
         try {
             FileWriter NewFileFW = new FileWriter(filePath);
-            NewFileFW.write("/*\n implements a mechanism for translating external predicates to corresponding tool invocation (auto-generated code)\n*/");
+            NewFileFW.write("/*\n implements a bridge method that links queries to external services (external predicates) with corresponding service invocation (auto-generated code)\n*/");
             NewFileFW.write("\n\npackage etb.etbDL.services;");
-            NewFileFW.write("\nimport java.util.ArrayList;");
+            //NewFileFW.write("\nimport java.util.List;");
             NewFileFW.write("\nimport etb.wrappers.*;");
             NewFileFW.write("\n\npublic class externPred2ServiceInstance extends externPred2Service {");
             NewFileFW.write("\n\t@Override");
-            NewFileFW.write("\n\tpublic genericWRP getGroundParams(String toolName, ArrayList<String> args, String mode) {");
+            //NewFileFW.write("\n\tpublic genericWRP getGroundParams(String toolName, List<String> args, String mode) {");
+            NewFileFW.write("\n\tpublic genericWRP getGroundParams(String toolName) {");
             NewFileFW.write("\n\t\tgenericWRP genWRP = null;");
             
             Iterator<String> it = services.keySet().iterator();
@@ -223,5 +215,17 @@ public class servicesPack {
         utils.runCMD0("cd " + System.getProperty("user.dir") + "/etb/wrappers/ && rm -f " + serviceID + "WRP.class " + serviceID + "ETBWRP.class");
     }
 
+    public List<String> getUpdated(Map<String, serviceSpec> inServices) {
+        return Arrays.asList(inServices.keySet().stream().filter(inServiceID -> !(inServices.get(inServiceID).getVersion().equals(services.get(inServiceID).getVersion()))).toArray(String[]::new));
+    }
+    
+    public void update(String serviceID, String version) {
+        if (!services.keySet().contains(serviceID)) {
+            System.out.println("=> a service with the name '" + serviceID + "' does not exist \u001B[31m(update not successful)\u001B[30m");
+        }
+        else {
+            services.get(serviceID).setVersion(version);
+        }
+    }
 }
 

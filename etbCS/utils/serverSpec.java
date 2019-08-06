@@ -65,36 +65,21 @@ public class serverSpec {
         return NewObj;
         
     }
-    
-    public void print(String indent) {
-        System.out.println(indent + "hostIP : " + address);
-        System.out.println(indent + "port: " + port);
-        System.out.println(indent + "services: " + services.toString());
-        /*
+        
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n==> [hostIP : " + address + " port : " + port + "]");
+        sb.append("\n--> services: " + services.toString());
         if (isRunning()) {
-            System.out.println(indent + "status:\u001B[32m running\u001B[30m");
+            sb.append("\n--> status:\u001B[32m running\u001B[30m");
         }
         else {
-            System.out.println(indent + "status:\u001B[31m down\u001B[30m");
+            sb.append("\n--> status:\u001B[31m down\u001B[30m");
         }
-         */
+        return sb.toString();
     }
 
-    public void print() {
-        System.out.println("--> hostIP : " + address);
-        System.out.println("--> port: " + port);
-        System.out.println("--> services: " + services.toString());
-        /*
-         if (isRunning()) {
-         System.out.println(indent + "status:\u001B[32m running\u001B[30m");
-         }
-         else {
-         System.out.println(indent + "status:\u001B[31m down\u001B[30m");
-         }
-         */
-    }
-
-    
     public boolean isRunning() {
         Socket serverSocket = new Socket();
         try {

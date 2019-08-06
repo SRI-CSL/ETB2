@@ -16,6 +16,6 @@ public class queryStatement implements etbDLStatement {
     
     @Override
     public void addTo(etbDatalog datalog) throws DatalogException {
-        datalog.setGoal(goal);
+        //datalog.setGoal(goal);
     }
 }

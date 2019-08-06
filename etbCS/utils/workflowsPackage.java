@@ -27,8 +27,8 @@ public class workFlowsPackage {
         this.repoDirPath = repoDirPath;
         Iterator<JSONObject> wfIter = workflowsJSON.iterator();
         while (wfIter.hasNext()) {
-            JSONObject workFlowSpecObj = (JSONObject) wfIter.next();
-            this.workflows.put((String) workFlowSpecObj.get("ID"), new workFlowSpec(workFlowSpecObj));
+            workFlowSpec workFlow = new workFlowSpec((JSONObject) wfIter.next());
+            this.workflows.put(workFlow.getID(), workFlow);
         }
     }
     
@@ -67,19 +67,18 @@ public class workFlowsPackage {
             
             JSONArray queriesJSON = (JSONArray) workFlowSpecJSON.get("queries");
             Iterator<JSONObject> queryIter = queriesJSON.iterator();
-            Map<String, querySpec> wfQueryList = new HashMap();
+            Map<Integer, querySpec> wfQueryList = new HashMap();
             while (queryIter.hasNext()) {
                 JSONObject queryJSON = queryIter.next();
                 querySpec wfQuery = new querySpec(queryJSON);
                 if (wfQuery.isValid()) {
-                    wfQueryList.put(wfQuery.getID(), wfQuery);
+                    wfQueryList.put(wfQuery.hashCode(), wfQuery);
                 }
                 else {
                     System.out.println("=> invalid query '" + queryJSON.toString() + "'' \u001B[31m(operation not successful)\u001B[30m");
                     return;
                 }
             }
-            
             workflows.put(ID, new workFlowSpec(ID, wfQueryList, scriptPath));
             System.out.println("=> workflow added successfully");
             
@@ -104,14 +103,34 @@ public class workFlowsPackage {
         return workflows;
     }
     
-    public void print() {
-        System.out.println("==> total number of workflows: " + workflows.size());
-        int count = 1;
-        for (String workflowID : workflows.keySet()) {
-            System.out.println("==> [workflow " + count++ + "] ID : " + workflowID);
-            workflows.get(workflowID).print();
+    public Map<Integer, ArrayList<String>> getAllQueries() {
+        Map<Integer, ArrayList<String>> queryToWorkFlowMap = new HashMap();
+        for(String workFlowID :  workflows.keySet()) {
+            workflows.get(workFlowID).getQueries().keySet().forEach(queryID -> {
+                if (queryToWorkFlowMap.containsKey(queryID)){
+                    ArrayList<String> workFlows = queryToWorkFlowMap.get(queryID);
+                    workFlows.add(workFlowID);
+                    queryToWorkFlowMap.put(queryID, workFlows);
+                }
+                else
+                    queryToWorkFlowMap.put(queryID, new ArrayList<String>(Arrays.asList(workFlowID)));
+            });
         }
+        return queryToWorkFlowMap;
     }
-    
+
+    public List<String> getWorkflows(int queryID) {
+        return Arrays.asList(workflows.keySet().stream()
+                             .filter(workFlowID -> workflows.get(workFlowID).containsQuery(queryID)
+        ).toArray(String[]::new));
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("\n==> number of workflows: " + workflows.size());
+        workflows.keySet().stream().forEach(workflowID -> sb.append(workflows.get(workflowID)));
+        return sb.toString();
+    }
+
 }
 

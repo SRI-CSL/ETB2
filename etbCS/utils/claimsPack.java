@@ -15,7 +15,7 @@ import etb.etbDL.output.*;
 
 public class claimsPack {
     
-    Map<String, claimSpec> claims = new HashMap();
+    Map<Integer, claimSpec> claims = new HashMap();
     
     public claimsPack() {
         claims = new HashMap();
@@ -32,91 +32,88 @@ public class claimsPack {
     
     public JSONArray toJSONObject() {
         JSONArray claimsJSON = new JSONArray();
-        for (String claimID : claims.keySet()) {
+        for (Integer claimID : claims.keySet()) {
             claimsJSON.add(claims.get(claimID).toJSONObject());
         }
         return claimsJSON;
     }
 
-    public void checkStatus(Map<String, workFlowSpec> workflows, String repoDirPath) {
-        for (String claimID : claims.keySet()) {
-            if (claims.get(claimID).checkStatus(repoDirPath, workflows) != 0) {
-                System.out.println("-> \u001B[31mclaim is outdated\u001B[30m (please update/upgrade/recreat the claim)");
-            }
-            else {
-                System.out.println("-> \u001B[32mclaim is up-to-date\u001B[30m");
+    public void checkStatus(servicePackage servicePack, Map<String, workFlowSpec> workflows, String repoDirPath) {
+        for (Integer claimID : claims.keySet()) {
+            switch (claims.get(claimID).checkStatus(servicePack, repoDirPath, workflows)) {
+                case 0: System.out.println("-> \u001B[32mclaim is up-to-date\u001B[30m");
+                    break;
+                case 1: System.out.println("-> \u001B[31mclaim is outdated\u001B[30m (please maintain claim)");
+                    //claims.get(claimID).maintain(updatedServiceIDs);
+                    break;
+                case 2: System.out.println("-> \u001B[31mclaim is outdated\u001B[30m (please upgrade/recreat the claim)");
+                    break;
+                case 3:  System.out.println("-> \u001B[31mclaim is outdated\u001B[30m (please upgrade/recreat the claim)");
+                    break;
+                default: System.out.println("-> \u001B[31munknown claim status\u001B[30m");
+                    break;
             }
         }
-        
     }
 
     public void add(claimSpec claim) {
         claims.put(claim.getID(), claim);
     }
-        
-    public void add(String claimStr, Map<String, workFlowSpec> workflows, String repoDirPath, etbNode etcSS) {
+    
+    //for terminal query input
+    private Expr readQuery(String inputQuery, String repoDirPath) {
         try {
-            Reader reader = new StringReader(claimStr);
+            Reader reader = new StringReader(inputQuery);
             StreamTokenizer scan = new StreamTokenizer(reader);
             scan.ordinaryChar('.');
             scan.commentChar('%');
             scan.quoteChar('"');
             scan.quoteChar('\'');
-            Expr claimExpr = etbDLParser.parseExpr(scan, repoDirPath);
-            claimExpr.print();
-            reader.close();
-            
-            //grabbing a matching workflow(s)
-            Set<String> wfNames = workflows.keySet();
-            Iterator<String> wfNamesIter = wfNames.iterator();
-            
-            int matchingWorkflowsCount = 0;
-            boolean validClaim = false;
-            
-            while (wfNamesIter.hasNext()) {
-                String wfName = wfNamesIter.next();
-                //workflows.get(wfName).print();
-                System.out.println("=> claimExpr: " + claimExpr.toString());
-                if (workflows.get(wfName).containsQuery(claimExpr)) {
-                    matchingWorkflowsCount++;
-                    try {
-                        etbDatalog dlPack = new etbDatalog();
-                        String wfScriptPath = workflows.get(wfName).getScriptPath();
-                        dlPack.parseToDatalog(wfScriptPath, repoDirPath);
-                        dlPack.setGoal(claimExpr);
-                        etbDatalogEngine dlEngine = new etbDatalogEngine();
-                        Collection<Map<String, String>> answers = dlEngine.run(etcSS, dlPack);//TODO: single claim derivation
-                        
-                        if (answers != null) {
-                            claimSpec claim = new claimSpec(repoDirPath, claimExpr, answers, wfName, utils.getSHA1(utils.getFilePathInDirectory(wfScriptPath, repoDirPath)), dlEngine.getDerivation(), claims.size());
-                            claims.put(claim.getID(), claim);
-                            validClaim = true;
-                            break; //more claims per run??
-                        }
-                        
-                    }
-                    catch (DatalogException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-            
-            if (validClaim == true) {
-                System.out.println("=> claim added successfully");
-            }
-            else {
-                System.out.println("=> \u001B[31mclaim addition not successful\u001B[30m (number of matching workflows: " + matchingWorkflowsCount + ")");
-            }
-            
+            Expr query = etbDLParser.parseExpr(scan, repoDirPath);
+            System.out.println("=> valid query found: " + query.toString());
+            //reader.close();
+            return query;
         }
         catch (IOException | DatalogException e){
             e.printStackTrace();
             System.out.println("=> invalid claim format \u001B[31m(operation not successful)\u001B[30m");
+            return null;
         }
         
     }
 
-    public void remove(String claimID) {
+    public void add(String claimStr, Map<String, serviceSpec> services, workFlowsPackage wfPack, String repoDirPath, etbNode etcSS) {
+        
+        Expr claimExpr = readQuery(claimStr, repoDirPath);
+        if (claims.containsKey(claimExpr.hashCode())) {
+            System.out.println("=> claim already exists \u001B[31m(operation not successful)\u001B[30m");
+            return;
+        }
+        //grabbing a matching workflow(s)
+        Map<String, workFlowSpec> workflows = wfPack.getWorkflows();
+        List<String> applWorkflows = wfPack.getWorkflows(claimExpr.queryHashCode());
+        System.out.println("=> number of matching applicable workflows: " + applWorkflows.size());
+        for (String workFlowID : applWorkflows) {
+            etbDatalog dlPack = new etbDatalog();
+            dlPack.parseDatalogScript(workflows.get(workFlowID).getScriptPath(), repoDirPath);
+            etbDatalogEngine dlEngine = new etbDatalogEngine(claimExpr);
+            Collection<Map<String, String>> answers;
+            if ((answers = dlEngine.run(etcSS, dlPack)) == null) {
+                System.out.println("=> \u001B[31mclaim addition not successful\u001B[30m (workflow: " + workFlowID + ")");
+            }
+            else {
+                claimSpec claim = new claimSpec(claimExpr, answers, workFlowID, workflows.get(workFlowID).getScriptID(repoDirPath), repoDirPath);
+                claim.setDerivationRules(dlEngine.getDerivationRules());
+                claim.setDerivationFacts(dlEngine.getDerivationFacts());
+                claim.setDerivationServices(dlEngine.getDerivationServices());
+                claims.put(claimExpr.hashCode(), claim);
+                System.out.println("=> claim added successfully");
+                break;
+            }
+        }
+    }
+    
+    public void remove(Integer claimID) {
         //checking if workflow already exists with the same name
         if (claims.keySet().contains(claimID)) {
             claims.remove(claimID); //TODO: chain of reactions for claim removal
@@ -127,41 +124,34 @@ public class claimsPack {
         }
     }
 
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("\n==> total number of claims: " + claims.size());
+        int count = 1;
+        for (Integer claimID : claims.keySet()) {
+            sb.append("\n[claim " + count++ + "]");
+            sb.append(claims.get(claimID));
+        }
+        return sb.toString();
+    }
+    
     public void print() {
         System.out.println("==> total number of claims: " + claims.size());
         int count = 1;
-        for (String claimID : claims.keySet()) {
-            System.out.println("==> [claim " + count++ + "] ID : " + claimID);
+        for (Integer claimID : claims.keySet()) {
+            System.out.println("[claim " + count++ + "] ");
             claims.get(claimID).print();
         }
     }
     
-    public void update(String claimID, Map<String, workFlowSpec> workflows, String repoDirPath, etbNode etcSS) {
+    public void update(Integer claimID, servicePackage servicePack, etbNode etcSS) {
         if (claims.containsKey(claimID)) {
-            claims.get(claimID).update(workflows, repoDirPath, etcSS);
+            claims.get(claimID).update(servicePack, etcSS);
         }
         else {
-            System.out.println("ERROR. Unknown claimID '" + claimID + "'");
+            System.out.println("ERROR. unknown claimID '" + claimID + "'");
         }
     }
-
-    public void upgrade(String claimID, Map<String, workFlowSpec> workflows, String repoDirPath, etbNode etcSS) {
-        if (claims.containsKey(claimID)) {
-            claims.get(claimID).upgrade(workflows, repoDirPath, etcSS);
-        }
-        else {
-            System.out.println("ERROR. Unknown claimID '" + claimID + "'");
-        }
-    }
-
-    public void recreate(String claimID, Map<String, workFlowSpec> workflows, String repoDirPath, etbNode etcSS) {
-        if (claims.containsKey(claimID)) {
-            claims.get(claimID).recreate(workflows, repoDirPath, etcSS);
-        }
-        else {
-            System.out.println("ERROR. Unknown claimID '" + claimID + "'");
-        }
-    }
-
+    
 }
 

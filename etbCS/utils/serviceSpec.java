@@ -19,6 +19,7 @@ public class serviceSpec {
     String ID;
     String signature;
     List<String> modes = new ArrayList();
+    String version = "1.0";
     
     public serviceSpec(String ID, String signature, List<String> modes) {
         this.ID = ID;
@@ -26,28 +27,51 @@ public class serviceSpec {
         this.modes = modes;
     }
     
-    public serviceSpec(JSONObject serverSpecJSON) {
-        
-        ID = (String) serverSpecJSON.get("ID");
-        signature = (String) serverSpecJSON.get("signature");
-        //String modesStr = (String) serverSpecJSON.get("modes");
-        modes = Arrays.asList(((String) serverSpecJSON.get("modes")).split("\\s+"));
+    public serviceSpec(String ID, String signature, List<String> modes, String version) {
+        this.ID = ID;
+        this.signature = signature;
+        this.modes = modes;
+        this.version = version;
+    }
+    
+    public serviceSpec(JSONObject serviceSpecJSON) {
+        ID = (String) serviceSpecJSON.get("ID");
+        signature = (String) serviceSpecJSON.get("signature");
+        modes = Arrays.asList(((String) serviceSpecJSON.get("modes")).split("\\s+"));
+        version = (String) serviceSpecJSON.get("version");
     }
     
     public String getSignature() {
         return signature;
     }
     
+    public String getID() {
+        return ID;
+    }
+    
     public List<String> getModes() {
         return modes;
     }
-    
-    public JSONObject toJSONObject(String ID) {
+
+    public JSONObject toJSONObject() {
         JSONObject NewObj = new JSONObject();
         NewObj.put("ID", ID);
         NewObj.put("signature", signature);
         NewObj.put("modes", String.join(" ", modes));
+        NewObj.put("version", version);
         return NewObj;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+
+    public String getVersion() {
+        return this.version;
+    }
+
+    public boolean isUpdated(String version) {
+        return (!this.version.equals(version));
     }
     
     public void generateWrappers() {
@@ -120,16 +144,13 @@ public class serviceSpec {
 
     }
 
-    public void print(String indent, String name) {
-        System.out.println(indent + "name : " + name);
-        System.out.println(indent + "signature: " + signature);
-        System.out.println(indent + "modes: " + modes.toString());
-    }
-
-    public void print() {
-        System.out.println("--> ID: " + ID);
-        System.out.println("--> signature: " + signature);
-        System.out.println("--> modes: " + modes.toString());
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n==> [service : " + ID + "]");
+        sb.append("\n--> signature: " + signature);
+        sb.append("\n--> modes: " + modes.toString());
+        return sb.toString();
     }
 
 }

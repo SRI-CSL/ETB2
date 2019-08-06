@@ -74,8 +74,8 @@ public class serversPackage {
     
     public void remove() {
         
-        print();
-        
+        //print();
+        System.out.print(this);
         while (true) {
             Scanner in = new Scanner(System.in);
             System.out.print("--> enter serverID : ");
@@ -102,13 +102,11 @@ public class serversPackage {
         return servers;
     }
     
-    public void print() {
-        System.out.println("==> total number of servers: " + servers.size());
-        int count = 1;
-        for (String serverID : servers.keySet()) {
-            System.out.println("==> [server " + count++ + "] ID : " + serverID);
-            servers.get(serverID).print();
-        }
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("\n==> number of servers: " + servers.size());
+        servers.keySet().stream().forEach(serverID -> sb.append(servers.get(serverID)));
+        return sb.toString();
     }
 
 }

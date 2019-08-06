@@ -5,6 +5,7 @@ import java.net.*;
 import java.io.*;
 import etb.etbCS.utils.*;
 import etb.etbDL.utils.*;
+import etb.etbDL.utils.utils;
 import etb.etbDL.services.*;
 import etb.etbDL.output.*;
 import java.security.MessageDigest;
@@ -14,6 +15,7 @@ public class clientMode {
     
     Socket serverSocket = new Socket();
     String repoDirPath;
+    String evidence = null;
     
     public clientMode(String hostIP, int port) {
         try {
@@ -26,13 +28,18 @@ public class clientMode {
         } catch (IOException e) {
             System.err.println("no I/O for the connection to " + hostIP + " at port " + port);
         }
+        //this.repoDirPath = repoDirPath;
     }
     
     public boolean isConnected() {
         return serverSocket.isConnected();
     }
     
-    public queryResult remoteServiceExecution(String serviceName, List<String> serviceArgs, String repoDirPath) {
+    public Expr remoteServiceExecution(Expr query, String repoDirPath) {
+        
+        String serviceName = query.getPredicate();
+        List<String> serviceArgs = query.getTerms();
+        
         this.repoDirPath = repoDirPath;
         try {
             InputStream inStr = serverSocket.getInputStream();
@@ -46,8 +53,68 @@ public class clientMode {
             //sending service server for execution
             toServerData.writeUTF(serviceName); //service name
             //sending the mode -- to know if service is defined for the mode
-            //String serviceInvMode = glueCodeAutoGen.getMode(serviceArgs); //TODO: move to utils **** from the glueCodeAutoGen
-            String serviceInvMode = utils.getMode(serviceArgs); //TODO: move to utils **** from the glueCodeAutoGen
+            String serviceInvMode = utils.getMode(serviceArgs);
+            toServerData.writeUTF(serviceInvMode);
+            
+            //sending service args to server
+            sendArgsToServer(serviceArgs, fromServerData, toServerData);
+            
+            //reading query processing result from server
+            List<String> resultArgs = new ArrayList();
+            String resultArg;
+            
+            //while(!(resultArg = in.readLine()).equals("done")) {
+            while(!(resultArg = fromServerData.readUTF()).equals("done")) {
+                resultArgs.add(resultArg);
+            }
+            
+            //String evidence = in.readLine();
+            this.evidence = fromServerData.readUTF();
+            
+            serverSocket.close();
+            Expr result = new Expr(serviceName, resultArgs);
+            System.out.println("\t\t -> service invocation result: " + result.toString());
+            
+            //importing remote results to local node
+            List<String> finalArgs = getFinalArgs(serviceArgs, resultArgs, serviceInvMode);
+            Expr finalResult = new Expr(serviceName, finalArgs);
+            System.out.println("\t\t -> service invocation final result: " + finalResult);
+            
+            Map<String, String> locBindings = new HashMap();
+            finalResult.unify(query, locBindings);
+            System.out.println("\t\t -> bindings: " + OutputUtils.bindingsToString(locBindings));
+            if (evidence == null) {
+                System.out.println("\t\t ->\u001B[31m [warning]\u001B[30m no evidence (please check the wrapper)");
+            }
+            else {
+                System.out.println("\t\t -> evidence: " + evidence);
+            }
+            return finalResult;
+            
+        } catch (IOException e) {
+            System.err.println("error: problem while sending service to remote server");
+        }
+        return null;
+    }
+    
+    /*
+    public queryResult remoteServiceExecution(String serviceName, List<String> serviceArgs, String repoDirPath) {
+        
+        
+        this.repoDirPath = repoDirPath;
+        try {
+            InputStream inStr = serverSocket.getInputStream();
+            DataInputStream fromServerData = new DataInputStream(inStr);
+            OutputStream outStr = serverSocket.getOutputStream();
+            DataOutputStream toServerData = new DataOutputStream(outStr);
+            
+            //sending requestTag to server
+            toServerData.writeUTF("execReqst");
+            
+            //sending service server for execution
+            toServerData.writeUTF(serviceName); //service name
+            //sending the mode -- to know if service is defined for the mode
+            String serviceInvMode = utils.getMode(serviceArgs);
             toServerData.writeUTF(serviceInvMode);
             
             //sending service args to server
@@ -75,7 +142,6 @@ public class clientMode {
             System.out.println("\t\t -> service invocation final result: " + finalQueryExpr.toString());
             
             Map<String, String> locBindings = new HashMap();
-            //resultQueryExpr.unify(queryExpr, locBindings);
             finalQueryExpr.unify(queryExpr, locBindings);
             System.out.println("\t\t -> bindings: " + OutputUtils.bindingsToString(locBindings));
             if (evidence == null) {
@@ -84,7 +150,6 @@ public class clientMode {
             else {
                 System.out.println("\t\t -> evidence: " + evidence);
             }
-            //return new queryResult(resultQueryExpr, evidence);
             return new queryResult(finalQueryExpr, evidence);
             
         } catch (IOException e) {
@@ -92,7 +157,7 @@ public class clientMode {
         }
         return new queryResult();
     }
-
+*/
     public String newServicesRegistration() {
         try {
             InputStream inStr = serverSocket.getInputStream();
@@ -111,31 +176,6 @@ public class clientMode {
         }
     }
 
-    //TODO: in utils
-    public static String getSHA1(String file) {
-        StringBuffer sb = new StringBuffer();
-        try {
-            MessageDigest sha1 = MessageDigest.getInstance("SHA1");
-            FileInputStream fis = new FileInputStream(file);
-            byte[] data = new byte[1024];
-            int read = 0;
-            while ((read = fis.read(data)) != -1) {
-                sha1.update(data, 0, read);
-            };
-            byte[] hashBytes = sha1.digest();
-            
-            for (int i = 0; i < hashBytes.length; i++) {
-                sb.append(Integer.toString((hashBytes[i] & 0xff) + 0x100, 16).substring(1));
-            }
-
-        } catch (NoSuchAlgorithmException e) {
-            System.out.println(e.getMessage());
-        } catch (IOException e) {
-            System.out.println(e.getMessage());
-        }
-        return sb.toString();
-    }
-    
     //TODO: in utils
     private boolean existsInRepo(String maybeChildPath) {
         maybeChildPath = repoDirPath + "/" + maybeChildPath;
@@ -203,7 +243,7 @@ public class clientMode {
                             toServerData.writeUTF(eachFilePath);
                             //toServerData.writeUTF(getSHA1(eachFilePath));
                             String eachFilePath2 = repoDirPath + "/" + eachFilePath;
-                            toServerData.writeUTF(getSHA1(eachFilePath2));
+                            toServerData.writeUTF(utils.getSHA1(eachFilePath2));
                             
                             //waiting for server's info on file status
                             String nextStep = fromServerData.readUTF();
@@ -241,7 +281,7 @@ public class clientMode {
                     
                     //toServerData.writeUTF(getSHA1(filePath));
                     String filePath2 = repoDirPath + "/" + filePath;
-                    toServerData.writeUTF(getSHA1(filePath2));
+                    toServerData.writeUTF(utils.getSHA1(filePath2));
 
                     //waiting for server's info on file status
                     String nextStep = fromServerData.readUTF();
@@ -312,4 +352,8 @@ public class clientMode {
         return fileName;
     }
     
+    public String getEvidence() {
+        return this.evidence;
+    }
+
 }

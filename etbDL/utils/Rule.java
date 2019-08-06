@@ -6,14 +6,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-//import etb.etbDL.engine.Engine;
+import java.util.Iterator;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONArray;
 
 //represents an ETB datalog rule
 public class Rule {
 	private Expr head;
-	private List<Expr> body;
-
+	private List<Expr> body = new ArrayList();
+    //to handle in-body dependency
+    
 	//constructor may reorder expressions in the body to evaluate rules correctly
 	public Rule(Expr head, List<Expr> body) {
 		this.setHead(head);
@@ -25,6 +27,24 @@ public class Rule {
 	public Rule(Expr head, Expr... body) {
 		this(head, Arrays.asList(body));
 	}
+    
+    public Rule(JSONObject ruleJSON) {
+        this.head = new Expr((JSONObject) ruleJSON.get("head"));
+        
+        JSONArray bodyJSON = (JSONArray) ruleJSON.get("body");
+        Iterator<JSONObject> bodyIter = bodyJSON.iterator();
+        while (bodyIter.hasNext()) {
+            this.body.add(new Expr((JSONObject) bodyIter.next()));
+        }
+        /*
+        JSONArray dependentsJSON = (JSONArray) ruleJSON.get("dependents");
+        Iterator<String> dependentsIter = dependentsJSON.iterator();
+        while (dependentsIter.hasNext()) {
+            this.dependents.add((String) dependentsIter.next());
+        }
+        */
+    }
+
 
 	/**
 	 * Checks whether a rule is valid.
@@ -37,7 +57,7 @@ public class Rule {
 	 * @throws DatalogException if the rule is not valid, with the reason in the message.
 	 */
 	public void validate() throws DatalogException {
-
+        /*
 		// Check for /safety/: each variable in the body of a rule should appear at least once in a positive expression,
 		// to prevent infinite results. E.g. p(X) :- not q(X, Y) is unsafe because there are an infinite number of values
 		// for Y that satisfies `not q`. This is a requirement for negation - [gree] contains a nice description.
@@ -45,6 +65,7 @@ public class Rule {
 		// them, i.e. a rule like `s(A, B) :- r(A,B), A > X` is invalid ('=' is an exception because it can bind variables)
 		// You won't be able to tell if the variables have been bound to _numeric_ values until you actually evaluate the
 		// expression, though.
+         */
 		Set<String> bodyVariables = new HashSet<String>();
 		for(Expr clause : getBody()) {
 			if (clause.isBuiltIn()) { //built in
@@ -118,7 +139,7 @@ public class Rule {
 			if(i < getBody().size() - 1)
 				sb.append(", ");
 		}
-		return sb.toString();
+        return sb.toString();
 	}
 
 	/**
@@ -180,4 +201,99 @@ public class Rule {
         }
         return false;
     }
+    
+    public boolean inBody(String pred) {
+        return (Arrays.asList(getBody().stream().map(bodyExpr -> bodyExpr.getPredicate())
+                      .filter(bodyPred -> bodyPred.equals(pred))
+                      .toArray(String[]::new)).size() != 0);
+    }
+
+    public int indexOf(String pred) {
+        Expr bodyExpr = Arrays.asList(getBody().stream()
+                              .filter(bodyExpr0 -> bodyExpr0.getPredicate().equals(pred))
+                              .toArray(Expr[]::new)).get(0);
+        return body.indexOf(bodyExpr);
+    }
+
+    public ArrayList<String> filterArgs(String mode, List<String> args) {
+        ArrayList<String> pair = new ArrayList();
+        List<String> ins = new ArrayList();
+        List<String> outs = new ArrayList();
+        for (int i=0; i < mode.length(); i++) {
+            if (mode.charAt(i) == '+')
+                ins.add(args.get(i));
+            else
+                outs.add(args.get(i));
+        }
+        pair.add(String.join(" ", ins));
+        pair.add(String.join(" ", outs));
+        return pair;
+    }
+    
+    public List<String> getDependents(List<Expr> facts) {
+        ArrayList<String> allPairs = new ArrayList();
+        for(Expr e : getBody()) {
+            //grabbing corresponding facts for a body pred
+            List<Expr> filtFacts = Arrays.asList(facts.stream()
+                        .filter(factExpr -> factExpr.getPredicate().equals(e.getPredicate()))
+                        .toArray(Expr[]::new));
+            //if at least one fact
+            if (filtFacts.size() > 0) {
+                e.setMode(filtFacts.get(0).getMode());
+                ArrayList<String> pair = filterArgs(e.getMode(), e.getTerms());
+                allPairs.addAll(pair);
+            }
+            else {
+                System.out.println("==>\u001B[31m[warning]\u001B[30m could not find fact: " + e.toString());
+            }
+        }
+
+        List<String> dependents = new ArrayList();
+        int bodySize = getBody().size();
+        for(int i = 0; i < bodySize; i++) {
+            List<String> subDependents  = new ArrayList();
+            for(int j = i+1; j < bodySize; j++) {
+                List<String> subIns = Arrays.asList(allPairs.get(j*2).split(" "));
+                if (Arrays.asList(((Arrays.asList(allPairs.get(i*2+1).split(" "))).stream()
+                               .filter(outVar -> subIns.contains(outVar))
+                               .toArray(String[]::new))).size() != 0)
+                    subDependents.add(j+"");
+            }
+            if (subDependents.size() == 0) {
+                subDependents.add("-1");
+            }
+            dependents.add(String.join(" ", subDependents));
+        }
+        //System.out.println("=> dependents: " + dependents.toString());
+        return dependents;
+    }
+    
+    public void printModes() {
+        System.out.println("=> head.getMode() : " + head.getMode());
+        for(int i = 0; i < getBody().size(); i++) {
+            System.out.println("=> getMode() for body expr " + i + " : " + head.getMode());
+        }
+    }
+    
+    public JSONObject toJSONObject() {
+        JSONObject NewObj = new JSONObject();
+        NewObj.put("head", head.toJSONObject());
+        
+        JSONArray bodyJSON = new JSONArray();
+        for(Expr bodyPred : body) {
+            bodyJSON.add(bodyPred.toJSONObject());
+        }
+        NewObj.put("body", bodyJSON);
+        /*
+        JSONArray dependentsJSON = new JSONArray();
+        for(String dependent : dependents) {
+            dependentsJSON.add(dependent);
+        }
+        NewObj.put("dependents", dependentsJSON);
+        */
+        
+        return NewObj;
+        
+    }
+
 }

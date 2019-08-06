@@ -3,7 +3,6 @@ package etb.etbDL.services;
 import java.util.List;
 import java.util.Arrays;
 import java.util.ArrayList;
-import etb.etbDL.services.glueCodeAutoGen;
 
 public abstract class genericWRP {
     
@@ -14,7 +13,7 @@ public abstract class genericWRP {
     
     //run specific inputs
     protected String mode;
-    protected ArrayList<String> argList;
+    protected List<String> argList;
     
     //outputs common for all wrappers
     protected String evidence;
@@ -26,7 +25,7 @@ public abstract class genericWRP {
     public abstract ArrayList<String> getListOutput(int pos);
     public abstract String getStrOutput(int pos);
     
-    public void invoke(String mode, ArrayList<String> argList) {
+    public void invoke(String mode, List<String> argList) {
         this.mode = mode;
         this.argList = argList;
         initialise();
@@ -34,7 +33,7 @@ public abstract class genericWRP {
         java2DatalogConst();
     }
     
-    protected String datalog2JavaStrConst(String mode, ArrayList<String> argList, int pos) {
+    protected String datalog2JavaStrConst(String mode, List<String> argList, int pos) {
         if (mode.length() != argList.size() || mode.length() < pos) {
             System.out.println("\u001B[31m[warning]\u001B[30m service mode does not match with arguments for the given tool wrapper");
             return null;
@@ -49,7 +48,7 @@ public abstract class genericWRP {
         return null;
     }
     
-    protected ArrayList<String> datalog2JavaListConst(String mode, ArrayList<String> argList, int pos) {
+    protected ArrayList<String> datalog2JavaListConst(String mode, List<String> argList, int pos) {
         if (mode.length() != argList.size() || mode.length() < pos) {
             System.out.println("\u001B[31m[warning]\u001B[30m service mode does not match with arguments for the given tool wrapper");
             return null;

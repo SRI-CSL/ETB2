@@ -3,7 +3,10 @@ package etb.etbDL.utils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONArray;
 
 import etb.etbDL.engine.Indexable;
 import etb.etbDL.statements.etbDLParser;
@@ -13,9 +16,9 @@ import etb.etbDL.statements.etbDLParser;
 
 public class Expr implements Indexable<String> {
 
-    private String predicate;
-    private List<String> terms;
-    public boolean negated = false;
+    String predicate;
+    List<String> terms = new ArrayList();
+    public boolean negated = false; //TODO: do we need it now?
     String signature, mode;
     
     public Expr(String predicate, List<String> terms) {
@@ -38,6 +41,17 @@ public class Expr implements Indexable<String> {
         this.terms = terms;
         this.signature = signature;
         this.mode = mode;
+    }
+
+    public Expr(JSONObject exprJSON) {
+        this.predicate = (String) exprJSON.get("predicate");
+        JSONArray termsJSON = (JSONArray) exprJSON.get("terms");
+        Iterator<String> termsIter = termsJSON.iterator();
+        while (termsIter.hasNext()) {
+            this.terms.add((String) termsIter.next());
+        }
+        this.signature = (String) exprJSON.get("signature");
+        this.mode = (String) exprJSON.get("mode");
     }
 
     public int arity() {
@@ -84,7 +98,6 @@ public class Expr implements Indexable<String> {
      * bindings represents the bindings of variables to values after unification
      * returns true if the expressions unify.
      */
-    
     public boolean unifyOLD(Expr that, Map<String, String> bindings) {
         if(!this.predicate.equals(that.predicate) || this.arity() != that.arity()) {
             return false;
@@ -121,6 +134,9 @@ public class Expr implements Indexable<String> {
         for (int i = 0; i < this.arity(); i++) {
             
             String term1 = this.terms.get(i), term2 = that.terms.get(i);
+            //System.out.println("=> term1: " + term1);
+            //System.out.println("=> term2: " + term2);
+
             ArrayList<String> listTerms1 = new ArrayList(Arrays.asList(term1.split(" ")));
             
             if (listTerms1.size() > 1 && listTerms1.get(0).equals("listIdent")) { //term1 is a list
@@ -224,6 +240,8 @@ public class Expr implements Indexable<String> {
         
         Expr that = new Expr(this.predicate, new ArrayList<>());
         that.negated = negated;
+        that.signature = signature;
+        String thatMode = "";
         
         int i=0;
         for(String term : this.terms) {
@@ -233,10 +251,19 @@ public class Expr implements Indexable<String> {
                 value = bindings.get(term); //TB: get value from corresponding variable term in the binding
                 if(value == null) {
                     value = term; //TB: leave it as it is if value is NULL
+                    thatMode += "-";
+                }
+                else if(utils.isVariable(value)) {//TB: try to sub unbound vars
+                    thatMode += "-";
+                }
+                else {
+                    thatMode += "+";
                 }
             }
             
             else {
+                //that.mode += mode.charAt(i);
+                thatMode += mode.charAt(i);
                 ArrayList<String> listTerms = new ArrayList(Arrays.asList(term.split(" ")));
                 if (listTerms.size() > 1) {// a list variable to be substituted
                     value = "listIdent";
@@ -254,7 +281,6 @@ public class Expr implements Indexable<String> {
                             value += " " + listTerms.get(j);
                         }
                     }
-                    //value = "listIdent " + value;
                 }
                 else { //constant
                     value = term;
@@ -264,6 +290,7 @@ public class Expr implements Indexable<String> {
             that.terms.add(value);
             i++;
         }
+        that.setMode(thatMode);
         return that;
     }
 
@@ -371,8 +398,8 @@ public class Expr implements Indexable<String> {
         return true;
     }
 
-    @Override
-    public int hashCode() {
+    //@Override
+    public int hashCodeOLD() {
         int hash = predicate.hashCode();
         for(String term : terms) {
             hash += term.hashCode();
@@ -380,6 +407,19 @@ public class Expr implements Indexable<String> {
         return hash;
     }
 
+    @Override
+    public int hashCode() {
+        int hash = predicate.hashCode();
+        int i=0;
+        for(String term : terms) {
+            if (mode.charAt(i) == '+') {
+                hash += term.hashCode();
+            }
+            i++;
+        }
+        return hash;
+    }
+    
     //converts Expr to string
     //@Override
     public String toStringOLD() {
@@ -530,5 +570,30 @@ public class Expr implements Indexable<String> {
         return true;
     }
 
+    public JSONObject toJSONObject() {
+        JSONObject NewObj = new JSONObject();
+        NewObj.put("predicate", predicate);
+        
+        JSONArray termsJSON = new JSONArray();
+        for(String term : terms) {
+            termsJSON.add(term);
+        }
+        NewObj.put("terms", termsJSON);
+        
+        NewObj.put("signature", signature);
+        NewObj.put("mode", mode);
+        
+        return NewObj;
+        
+    }
+    
+    public int queryHashCode() {
+        int hash = predicate.hashCode()+mode.hashCode();
+        for (int i=0; i<mode.length(); i++){
+            if (mode.charAt(i) == '+')
+                hash += (signature.charAt(i)+"").hashCode();
+        }
+        return hash;
+    }
     
 }

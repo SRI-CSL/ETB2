@@ -14,8 +14,6 @@ public class goalNode {
     Expr literal;
     String status;
     Set<clauseNode> parents = new HashSet();
-    
-    //Map<Expr, JSONObject> claimsMap = new HashMap();
     Map<Expr, String> claimsMap = new HashMap();
     ArrayList<Expr> claims = new ArrayList();
         
@@ -61,32 +59,32 @@ public class goalNode {
     public String getEvidence(Expr claim) {
         return this.claimsMap.get(claim);
     }
+   
     public void addClaims(Expr claim, String evidence) {
-        //this.claimsMap.put(claim, new JSONObject());
         this.claimsMap.put(claim, evidence);
         this.claims.add(claim);
     }
-    
+
+    public Expr getClaim() {//TODO: Q&D more than one claims??
+        
+        if (claims.size() > 1) {
+            System.out.println("=> more than one claims in a goal node \u001B[31m(warning)\u001B[30m");
+        }
+        return claims.get(0);
+    }
+
     public void print() {
-        System.out.println("goal literal : " + literal.toString());
-        printClaims();
-        System.out.println("parent clauses : ");
+        System.out.println("=> goal literal : " + literal.toString());
+        Iterator<Expr> claimsIter = claimsMap.keySet().iterator();
+        while(claimsIter.hasNext()) {
+            System.out.println(" -> claim : " + claimsIter.next().toString());
+        }
+        System.out.println(" -> parent clauses : ");
         Iterator<clauseNode> clIter = parents.iterator();
         while (clIter.hasNext()) {
             clIter.next().print();
         }
-        System.out.println("end of parent clauses ");
-    }
-    
-    public void printClaims() {
-        Set<Expr> claimsSet = claimsMap.keySet();
-        Iterator<Expr> claimsIter = claimsSet.iterator();
-        int i=1;
-        while(claimsIter.hasNext()) {
-            Expr claim = claimsIter.next();
-            System.out.println("claim" + i + " : " + claim.toString());
-            System.out.println("evidence" + (i++) + " : " + claimsMap.get(claim));
-        }
+        System.out.println(" -> end of parent clauses ");
     }
     
 }

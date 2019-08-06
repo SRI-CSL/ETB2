@@ -8,53 +8,62 @@ import etb.etbDL.utils.*;
 public class workFlowSpec {
 
     String ID;
-    Map<String, querySpec> queryList = new HashMap();
-    String scriptPath;
+    String scriptPath; //TODO: hashing scriptfile
+    Map<Integer, querySpec> queries = new HashMap();
     
-    public workFlowSpec(String ID, Map<String, querySpec> queryList, String scriptPath) {
+    public workFlowSpec(String ID, Map<Integer, querySpec> queries, String scriptPath) {
         this.ID = ID;
-        this.queryList = queryList;
+        this.queries = queries;
         this.scriptPath = scriptPath;
     }
 
     public workFlowSpec(JSONObject workFlowSpecJSON) {
-        this.ID = (String) workFlowSpecJSON.get("ID");
-        JSONArray queryListJSON = (JSONArray) workFlowSpecJSON.get("queries");
-        for (int i = 0; i < queryListJSON.size(); i++) {
-            querySpec qSpec = new querySpec((JSONObject) queryListJSON.get(i));
-            this.queryList.put(qSpec.getID(), qSpec);
+        ID = (String) workFlowSpecJSON.get("ID");
+        JSONArray queriesJSON = (JSONArray) workFlowSpecJSON.get("queries");
+        for (int i = 0; i < queriesJSON.size(); i++) {
+            querySpec qSpec = new querySpec((JSONObject) queriesJSON.get(i));
+            this.queries.put(qSpec.hashCode(), qSpec);
         }
         this.scriptPath = (String) workFlowSpecJSON.get("script");
-    }
-
-    public String getScriptPath() {
-        return this.scriptPath;
     }
     
     public JSONObject toJSONObject() {
         JSONObject NewObj = new JSONObject();
         NewObj.put("ID", ID);
-        JSONArray queryListJSON = new JSONArray();
-        for (String queryPred : queryList.keySet()) {
-            queryListJSON.add(queryList.get(queryPred).toJSONObj(queryPred));
+        JSONArray queriesJSON = new JSONArray();
+        for (Integer queryHash : queries.keySet()) {
+            queriesJSON.add(queries.get(queryHash).toJSONObj());
         }
-        NewObj.put("queries", queryListJSON);
+        NewObj.put("queries", queriesJSON);
         NewObj.put("script", scriptPath);
         return NewObj;
     }
-    
-    public void print() {
-        System.out.println("--> ID: " + ID);
-        System.out.println("--> scriptPath: " + scriptPath);
-        System.out.println("--> queryList: " + queryList.toString());
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n==> [workflow : " + ID + "]");
+        sb.append("\n--> scriptPath: " + scriptPath);
+        sb.append("\n--> queries: " + queries.values());
+        return sb.toString();
     }
 
+    public String getScriptPath() {
+        return this.scriptPath;
+    }
+        
+    //TODO: needed?
     public boolean containsQuery(Expr query) {
-        return (this.queryList.containsKey(query.getPredicate()) &&
-                this.queryList.get(query.getPredicate()).equals(query));
+        return (this.queries.containsKey(query.getPredicate()) &&
+                this.queries.get(query.getPredicate()).equals(query));
     }
 
-    public String getSHA1(String repoDirPath) {
+    public boolean containsQuery(Integer queryID) {
+        return queries.containsKey(queryID);
+    }
+
+    //TODO: currently tracks any change to the datalog script
+    public String getScriptID(String repoDirPath) {
         return utils.getSHA1(utils.getFilePathInDirectory(scriptPath, repoDirPath));
     }
     
@@ -62,4 +71,7 @@ public class workFlowSpec {
         return ID;
     }
     
+    Map<Integer, querySpec> getQueries() {
+        return queries;
+    }
 }

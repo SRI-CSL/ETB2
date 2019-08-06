@@ -5,15 +5,18 @@ import java.util.*;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONArray;
 
+
 import etb.etbDL.utils.Expr;
+import etb.etbDL.services.*;
+import etb.etbDL.output.*;
+import etb.etbCS.clientMode;
 
 
 public class querySpec {
 
     String ID, mode; //TODO: more than one mode?
     signatureSpec signature;
-    boolean valid = false;;
-    
+    boolean valid = false;
     
     public querySpec(String ID, signatureSpec signature, String mode) {
         this.ID = ID;
@@ -33,7 +36,7 @@ public class querySpec {
         this.valid = signature.isValid();
     }
     
-    public JSONObject toJSONObj(String ID) {
+    public JSONObject toJSONObj() {
         JSONObject NewObj = new JSONObject();
         NewObj.put("ID", ID);
         NewObj.put("signature", "" + signature);
@@ -41,6 +44,14 @@ public class querySpec {
         return NewObj;
     }
     
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("<" + ID + "/" + signature.toList().size());
+        //sb.append(", " + hashCode() + ", [" + String.join(", ", signature.toList()) + "], " + mode + ">");
+        sb.append(", [" + String.join(", ", signature.toList()) + "], " + mode + ">");
+        return sb.toString();
+    }
+
     public signatureSpec getSignature() {
         return this.signature;
     }
@@ -53,16 +64,8 @@ public class querySpec {
         return this.ID;
     }
     
-    public String toString() {
-        StringBuilder sb = new StringBuilder("<" + ID);
-        sb.append(", [" + String.join(", ", signature.toList()) + "], " + mode + ">");
-        return sb.toString();
-    }
-
     public boolean isMatching(querySpec qSpec) {
-        if (this.signature.equals(qSpec.getSignature()) && this.mode.equals(qSpec.getMode()))
-            return true;
-        return false;
+        return (this.signature.equals(qSpec.getSignature()) && this.mode.equals(qSpec.getMode()));
     }
     
     public boolean equals(querySpec qSpec) {
@@ -71,28 +74,27 @@ public class querySpec {
                 this.mode.equals(qSpec.getMode()));
     }
     
-    public boolean equals2(Expr qSpec) {
-        
-        System.out.println("=> this.signature: " + this.signature);
-        System.out.println("=> qSpec.getSignature(): " + qSpec.getSignature());
-        
-        
-        
-        return (this.ID.equals(qSpec.getPredicate()) &&
-                this.signature.equals(qSpec.getSignature()) &&
-                this.mode.equals(qSpec.getMode()));
-    }
-    
     public boolean equals(Expr qSpec) {
-        
         return (this.ID.equals(qSpec.getPredicate()) &&
                 this.signature.equals(qSpec.getSignature(), qSpec.getMode()) &&
                 this.mode.equals(qSpec.getMode()));
     }
     
-    
     public boolean isValid() {
         return valid;
     }
+    
+    @Override
+    public int hashCode() {
+        int hash = ID.hashCode()+mode.hashCode();
+        String signStr = signature.toString();
+        for (int i=0; i<mode.length(); i++){
+            if (mode.charAt(i) == '+')
+                hash += (signStr.charAt(i)+"").hashCode();
+        }
+        return hash;
+    }
+    
+    
 }
 

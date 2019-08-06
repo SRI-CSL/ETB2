@@ -12,9 +12,7 @@ public class clauseNode {
     Set<clauseNode> subClauses = new HashSet();
     String evidence = null;
     
-    public clauseNode() {
-        
-    }
+    public clauseNode() {}
     
     public clauseNode(Rule clause, String evidence) {//to be used in the glue code
         this.clause = clause;
@@ -34,16 +32,17 @@ public class clauseNode {
     
     public void setSubGoal(goalNode gNode){
         this.subGoal = gNode;
+        this.subGoalIndex = 0;
     }
     
     public goalNode getSubGoal(){
         return this.subGoal; 
     }
-    
+    /*
     public void setSubGoalIndex(int subGoalIndex) {
         this.subGoalIndex = subGoalIndex;
     }
-    
+    */
     public int getSubGoalIndex() {
         return this.subGoalIndex;
     }

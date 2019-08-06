@@ -119,4 +119,9 @@ public class utils {
         else
             return "+";
     }
+    
+    public static String fromETBfile(String etbFilePath) {
+        return etbFilePath.substring(5, etbFilePath.length()-1);
+    }
+    
 }
