@@ -10,7 +10,6 @@ import java.util.regex.Pattern;
 import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
 import etb.etbDL.statements.etbDLParser;
-//import etb.etbCS.etcServer;
 import etb.etbCS.clientMode;
 
 import etb.etbDL.utils.*;

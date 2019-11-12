@@ -25,9 +25,11 @@ public class etbDatalogEngine {
     
     public etbDatalogEngine(Expr mainGoal) {
         this.mainGoal = mainGoal;
-        this.goals.add(new goalNode(0, mainGoal, "open")); //initial goal instantiation
+        //initial goal instantiation
+        this.goals.add(new goalNode(0, mainGoal, "open"));
         this.foundNewGoal = true;
-        this.index = 1; //termination for the abstract machine
+        //termination for the abstract machine
+        this.index = 1;
     }
 
     public etbDatalogEngine() {}
@@ -78,7 +80,7 @@ public class etbDatalogEngine {
         }
     }
 
-    private void resolve(etbNode node, etbDatalog dlPack) {
+    private boolean resolve(etbNode node, etbDatalog dlPack) {
         Iterator<goalNode> goalIter = goals.iterator();
         while (goalIter.hasNext()) {
             goalNode gNode = goalIter.next();
@@ -98,6 +100,7 @@ public class etbDatalogEngine {
                     }
                     i++;
                 }
+                //TODO: multiple derivation turned off -- do we need them?
                 if (foundNewClause) {
                     System.out.println("=> goal successfully resolved");
                     gNode.setStatus("resolved");
@@ -113,7 +116,6 @@ public class etbDatalogEngine {
                 boolean rulesFound = false;
                 for (Rule rule : goalRules) {
                     System.out.println("\t -> rule " + i + " : " + rule.toString());
-                    
                     Map<String, String> locBindings = new HashMap();
                     rule.getHead().unify(gNode.getLiteral(), locBindings);
                     System.out.println("\t    bindings: " + OutputUtils.bindingsToString(locBindings));
@@ -131,12 +133,13 @@ public class etbDatalogEngine {
                     System.out.println("\t -> no matching rules");
                 }
                 
-                
                 serviceInvocation inv = new serviceInvocation(gNode.getLiteral());
                 inv.process(node);
                 if (inv.getResult() != null) {
                     String serviceName = gNode.getLiteral().getPredicate();
-                    derivServices.put(serviceName, node.getServicePack().get(serviceName));
+                    if (inv.isLocal()) {
+                        derivServices.put(serviceName, node.getServicePack().get(serviceName));
+                    }
                     clauses.add(new clauseNode(new Rule(inv.getResult(), new ArrayList()), gNode, inv.getEvidence()));
                     foundNewClause = true;
                 }
@@ -151,10 +154,12 @@ public class etbDatalogEngine {
                 else {
                     System.out.println("** no facts, no rules, and no external services supporting goal predicate");
                     System.out.println("\u001B[31m\t[datalog engine backtracks]\u001B[30m");
+                    return false;
                 }
                 gNode.setStatus("resolved");
             }
         }
+        return true;
     }
 
     private void propagate() {
@@ -190,10 +195,12 @@ public class etbDatalogEngine {
     
     //runs the DL engine over input rules and facts in the DL suit
     public Collection<Map<String, String>> run(etbNode etcSS, etbDatalog dlPack) {
-        
         do {
             foundNewGoal = false;
-            resolve(etcSS, dlPack);
+            //resolve(etcSS, dlPack);
+            if (!resolve(etcSS, dlPack)) {
+                return null;
+            }
             
             if (foundNewClause) {
                 do {
@@ -216,10 +223,6 @@ public class etbDatalogEngine {
         Iterator<goalNode> goalIter00 = goals.iterator();
         while (goalIter00.hasNext()) {
             goalNode gNode = goalIter00.next();
-            //gNode.print();
-            //System.out.println("=> gNode.getLiteral() : " + gNode.getLiteral());
-            //System.out.println("=> gNode.getClaim() : " + gNode.getClaim());
-            //System.out.println("=> gNode.getLiteral().getMode() : " + gNode.getLiteral().getMode());
             Expr derivFact = gNode.getClaim();
             derivFact.setMode(gNode.getLiteral().getMode());
             derivFacts.add(derivFact);

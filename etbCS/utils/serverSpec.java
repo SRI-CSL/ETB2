@@ -71,12 +71,14 @@ public class serverSpec {
         StringBuilder sb = new StringBuilder();
         sb.append("\n==> [hostIP : " + address + " port : " + port + "]");
         sb.append("\n--> services: " + services.toString());
+        /*
         if (isRunning()) {
             sb.append("\n--> status:\u001B[32m running\u001B[30m");
         }
         else {
             sb.append("\n--> status:\u001B[31m down\u001B[30m");
         }
+         */
         return sb.toString();
     }
 

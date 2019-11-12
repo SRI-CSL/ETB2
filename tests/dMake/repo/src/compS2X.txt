@@ -1,9 +1,0 @@
-	File myFile = new File("test3.txt");
-        FileInputStream inFromFile = new FileInputStream(myFile);
-        BufferedInputStream buffFromFile = new BufferedInputStream(inFromFile);
-        DataInputStream dataFromFile = new DataInputStream(buffFromFile);
-
-	File myFile = new File("test3.txt");
-        FileInputStream inFromFile = new FileInputStream(myFile);
-        BufferedInputStream buffFromFile = new BufferedInputStream(inFromFile);
-        DataInputStream dataFromFile = new DataInputStream(buffFromFile);

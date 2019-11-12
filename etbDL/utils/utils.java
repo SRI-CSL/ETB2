@@ -65,25 +65,23 @@ public class utils {
         return sb.toString();
     }
     
-    public static boolean existsInRepo(String maybeChildPath, String repoDirPath){
-        File maybeChild = new File(maybeChildPath);
-        File possibleParent = new File(repoDirPath);
+    public static boolean existsInRepo(String filePath, String repoPath){
+        File file = new File(filePath);
+        File repo = new File(repoPath);
+        
+        if (!file.exists())
+            return false;
+        
         try {
-            
-            if (!maybeChild.exists()) {
-                return false;
-            }
-            
-            final File parent = possibleParent.getCanonicalFile();
-            File child = maybeChild.getCanonicalFile();
-            while (child != null) {
-                if (child.equals(parent)) {
+            final File canRepo = repo.getCanonicalFile();
+            File canFile = file.getCanonicalFile();
+            while (canFile != null) {
+                if (canFile.equals(canRepo))
                     return true;
-                }
-                child = child.getParentFile();
+                canFile = canFile.getParentFile();
             }
         } catch (IOException e) {
-            System.out.println("could not find file '" + maybeChildPath + "' in the git repo");
+            System.out.println("\u001B[31m[error]\u001B[30m file '" + filePath + "' is not in the git repo");
             System.out.println(e.getMessage());
         }
         return false;
@@ -101,7 +99,6 @@ public class utils {
             file = new File(filePath);
             if (file.exists()) {
                 return file.getAbsolutePath();
-                //return filePath;
             }
             else
                 return null;

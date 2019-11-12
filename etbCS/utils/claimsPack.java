@@ -60,6 +60,10 @@ public class claimsPack {
         claims.put(claim.getID(), claim);
     }
     
+    public void add(int hashcode, claimSpec claim) {
+        claims.put(hashcode, claim);
+    }
+
     //for terminal query input
     private Expr readQuery(String inputQuery, String repoDirPath) {
         try {

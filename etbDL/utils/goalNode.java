@@ -66,7 +66,6 @@ public class goalNode {
     }
 
     public Expr getClaim() {//TODO: Q&D more than one claims??
-        
         if (claims.size() > 1) {
             System.out.println("=> more than one claims in a goal node \u001B[31m(warning)\u001B[30m");
         }

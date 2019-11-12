@@ -19,19 +19,13 @@ public class cbmcWRP extends cbmcETBWRP {
 	@Override
 	public void run(){
 		if (mode.equals("++-")) {
-            File SourceFile = new File(in1);
-            String FILEDIR = SourceFile.getParent();
+            out3 = workSpaceDirPath + "/cbmcRes.json";
             
-            String TEMP = FILEDIR + "/CBMC-TEMP";
-            out3 = FILEDIR + "/cbmcRes.json";
             try {
-                
                 JSONParser parser = new JSONParser();
                 Object JsonObj = parser.parse(new FileReader(in2));
                 JSONArray Errors = (JSONArray) JsonObj;
-                
-                JSONArray RefErrors = apply(Errors, in2, TEMP);
-                
+                JSONArray RefErrors = apply(in1, Errors, workSpaceDirPath + "/cbmcTEMP");
                 
                 FileWriter fw = new FileWriter(out3);
                 fw.write(RefErrors.toJSONString());
@@ -43,16 +37,13 @@ public class cbmcWRP extends cbmcETBWRP {
             } catch (ParseException e) {
                 e.printStackTrace();
             }
-            
-
 		}
 		else {
 			System.out.println("unrecognized mode for cbmc");
 		}
 	}
     
-    
-    public static String[] getProcedures(String File, String TEMPDIR){
+    private String[] getProcedures(String File, String TEMPDIR){
         
         File SourceFileObj = new File(File);
         String SourceFileBase = SourceFileObj.getName();
@@ -67,13 +58,13 @@ public class cbmcWRP extends cbmcETBWRP {
         return ProcList;
     }
     
-    public static boolean cbmcCheck(String SourceFile, String TEMPDIR, String assertion, Long line, String annotID, String procedure){
+    private boolean cbmcCheck(String SourceFile, String TEMPDIR, String assertion, Long line, String annotID, String procedure){
         File SourceFileObj = new File(SourceFile);
         String SourceFileBase = SourceFileObj.getName();
         String SourceDirPath = SourceFileObj.getParent();
         File SourceDir = new File(SourceDirPath);
         
-        String AnnotDirPath = TEMPDIR + "/AnnotDir" + annotID;
+        String AnnotDirPath = TEMPDIR + "/annotDir" + annotID;
         File AnnotDir = new File(AnnotDirPath);
         
         try{
@@ -83,27 +74,14 @@ public class cbmcWRP extends cbmcETBWRP {
         }
         
         runCMD0("cd " + AnnotDirPath + " && make clean && rm Makefile "+ SourceFileBase);
-        
         String annotProgPath = AnnotDirPath + "/" + SourceFileBase;
         annotateFile(SourceFile, assertion, line, annotProgPath);
         String cbmcOUT = runCMD1("echo $(timeout 1 cbmc --function " + procedure + " " + annotProgPath + ") | grep -q 'VERIFICATION FAILED' && echo $?");
-        //System.out.println("cbmcOUT 0: " + cbmcOUT);
-        
         cbmcOUT = (cbmcOUT.replace("\n","")).replace(" ","");
-        
-        //System.out.println("cbmcOUT: " + cbmcOUT);
-        //System.out.println("echo $(timeout 1 cbmc --function " + procedure + " " + annotProgPath + ") | grep -q 'VERIFICATION FAILED' && echo $?");
-        /*if (cbmcOUT.equals("0")) {
-         System.out.println("\u001B[31m ***** ZERO [false alarm]\u001B[0m");
-         }
-         else {
-         System.out.println("\u001B[31m ***** NON ZERO [false alarm]\u001B[0m");
-         }
-         */
         return cbmcOUT.equals("0");
     }
     
-    public static boolean cbmcRefineBB(String SourceFile, String TEMPDIR, String assertion, Long line, int i, JSONObject Error){
+    private boolean cbmcRefineBB(String SourceFile, String TEMPDIR, String assertion, Long line, int i, JSONObject Error){
         String[] ProcList = getProcedures(SourceFile, TEMPDIR);
         for (int j = 0; j < ProcList.length; j++){
             String annotID = "" + (i+1) + (j+1);
@@ -119,7 +97,7 @@ public class cbmcWRP extends cbmcETBWRP {
         return false;
     }
     
-    public static boolean cbmcRefineBB(String SourceFile, String TEMPDIR, String assertion, Long line, int i, String procedure, JSONObject Error){
+    private boolean cbmcRefineBB(String SourceFile, String TEMPDIR, String assertion, Long line, int i, String procedure, JSONObject Error){
         String annotID = "" + (i+1);
         if (cbmcCheck(SourceFile, TEMPDIR, assertion, line, annotID, procedure)){
             //System.out.println("\u001B[31m ***** def-proc [real error]\u001B[0m");
@@ -134,7 +112,7 @@ public class cbmcWRP extends cbmcETBWRP {
         }
     }
 
-    public static JSONArray apply(JSONArray Errors, String SourceFile, String TEMPDIR){
+    private JSONArray apply(String SourceFile, JSONArray Errors, String TEMPDIR){
         JSONArray RefErrors = new JSONArray();
         System.out.println("");
         Iterator<JSONObject> iterator = Errors.iterator();
@@ -205,7 +183,7 @@ public class cbmcWRP extends cbmcETBWRP {
         return RefErrors;
     }
     
-    public static void runCMD0(String cmd0){
+    private void runCMD0(String cmd0){
         Runtime run = Runtime.getRuntime();
         try {
             String[] cmd = { "/bin/sh", "-c", cmd0 };
@@ -218,7 +196,7 @@ public class cbmcWRP extends cbmcETBWRP {
         }
     }
     
-    public static String runCMD1(String cmd0){
+    private String runCMD1(String cmd0){
         Runtime run = Runtime.getRuntime();
         String Out = "";
         try {
@@ -238,7 +216,7 @@ public class cbmcWRP extends cbmcETBWRP {
         return Out;
     }
     
-    public static void annotateFile(String InFile, String assertion, Long line, String OutFile) {
+    private void annotateFile(String InFile, String assertion, Long line, String OutFile) {
         try {
             Scanner scan = new Scanner(new File(InFile));
             FileWriter fw = new FileWriter(OutFile);

@@ -17,55 +17,36 @@ import org.json.simple.parser.ParseException;
 import java.io.File;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.io.FileUtils;
 
 public class inferWRP extends inferETBWRP {
-    String FILEBASE;
-    String FILEDIR;
-    JSONArray PartErrors;
     
-	@Override
+    @Override
 	public void run(){
-        File SourceFile = new File(in1);
-        SourceFile = new File(SourceFile.getAbsolutePath());
-        FILEBASE = SourceFile.getName();
-        FILEDIR = SourceFile.getParent();
-        PartErrors = new JSONArray();
-        
-		if (mode.equals("+-")) {
-
-            write_Makefile();
-            getErrors();
-            clean();
-            
-            out2 = FILEDIR + "/inferRes.json";
-            
+        if (mode.equals("+-")) {
+            out2 = workSpaceDirPath + "/inferRes.json";
             try {
+                FileUtils.copyDirectory(new File(in1).getAbsoluteFile().getParentFile(), new File(workSpaceDirPath));
+                FileWriter makeFileWriter = new FileWriter(workSpaceDirPath + "/Makefile");
+                makeFileWriter.write("\n\nSOURCES = $(shell ls *.c)\nOBJECTS = $(SOURCES:.c=.o)\n\nall: $(OBJECTS)\n\n.c.o:\n\t${CC} -c $<\n\nclean:\n\trm -rf $(OBJECTS) *.xml *.o infer-out \n");
+                makeFileWriter.flush();
+                makeFileWriter.close();
+
                 FileWriter fw = new FileWriter(out2);
-                fw.write(PartErrors.toJSONString());
+                fw.write(getErrors().toJSONString());
                 fw.flush();
                 fw.close();
+
                 
             } catch (IOException e) {
                 e.printStackTrace();
             }
+            
 		}
 		else {
 			System.out.println("unrecognized mode for infer");
 		}
 	}
-    
-    private void write_Makefile(){
-        try {
-            String MAKEFILE_Path = FILEDIR + "/Makefile";
-            FileWriter MAKEFILE_FW = new FileWriter(MAKEFILE_Path);
-            MAKEFILE_FW.write("\n\nSOURCES = $(shell ls *.c)\nOBJECTS = $(SOURCES:.c=.o)\n\nall: $(OBJECTS)\n\n.c.o:\n\t${CC} -c $<\n\nclean:\n\trm -rf $(OBJECTS) *.xml *.o infer-out \n");
-            MAKEFILE_FW.flush();
-            MAKEFILE_FW.close();
-            
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
     
     private String filterErrorType(String Type) {
         switch (Type) {
@@ -82,13 +63,14 @@ public class inferWRP extends inferETBWRP {
         return "";
     }
     
-    private void getErrors(){
+    private JSONArray getErrors(){
         
         String quickFixOSX = "ls /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk && export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk";
-        runCMD0("cd " + FILEDIR + " && make clean && " + quickFixOSX + " && infer run -- gcc -c " + FILEBASE);
+        runCMD0("cd " + workSpaceDirPath + " && make clean && " + quickFixOSX + " && infer run -- gcc -c " + new File(in1).getName());
         JSONParser parser = new JSONParser();
+        JSONArray PartErrors = new JSONArray();
         try {
-            Object JsonObj = parser.parse(new FileReader(FILEDIR + "/infer-out/report.json"));
+            Object JsonObj = parser.parse(new FileReader(workSpaceDirPath + "/infer-out/report.json"));
             JSONArray Errors = (JSONArray) JsonObj;
             Iterator<JSONObject> iterator = Errors.iterator();
             for (int i = 0 ; iterator.hasNext() ; ++i ){
@@ -138,11 +120,12 @@ public class inferWRP extends inferETBWRP {
         } catch (ParseException e) {
             e.printStackTrace();
         }
+        return PartErrors;
         
     }
     
     private void clean(){
-        runCMD0("cd " + FILEDIR + " && make clean && rm Makefile");
+        runCMD0("cd " + workSpaceDirPath + " && make clean && rm Makefile");
     }
     
     private static void runCMD0(String cmd0){

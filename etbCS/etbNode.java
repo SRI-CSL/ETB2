@@ -1,6 +1,7 @@
 package etb.etbCS;
 
 import java.util.*;
+import org.apache.commons.io.FileUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -16,57 +17,55 @@ import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
 import etb.etbDL.statements.etbDLParser;
 import etb.etbDL.utils.*;
-import etb.etbDL.services.*;
 import etb.etbDL.output.*;
 
 public class etbNode {
-    
     String hostIP = "127.0.0.1";
     int port = 0;
+    
     String repoDirPath = System.getProperty("user.dir"); //gitRepo
     
-    serversPackage serversPack;
-    servicePackage servicePack;
-    workFlowsPackage workflowsPack;
-    claimsPack claims;
+    serversPackage serversPack = new serversPackage();
+    servicePackage servicePack = new servicePackage();
+    workFlowsPackage workflowsPack = new workFlowsPackage();
+    claimsPack claims = new claimsPack();
     
     String paramsFilePath = System.getProperty("user.dir") + "/params.json";
-    JSONObject nodeParamsJSONObj = new JSONObject();
     
+    //constructs an ETB object on the given IP address
     public etbNode() {
         try {
             this.hostIP = Inet4Address.getLocalHost().getHostAddress();
         } catch (UnknownHostException e) {
             System.out.println(e.getMessage());
-            System.exit(1);
         }
-        
-        servicePack = new servicePackage();
-        serversPack = new serversPackage();
-        workflowsPack = new workFlowsPackage();
-        claims = new claimsPack();
-    }
-    
-    public serversPackage getServersPack() {
-        return serversPack;
     }
     
     public String getRepoDirPath() {
         return repoDirPath;
     }
     
+    public int getPort() {
+        return this.port;
+    }
+    
+    public serversPackage getServersPack() {
+        return serversPack;
+    }
+    
     public servicePackage getServicePack() {
         return servicePack;
     }
     
+    //sets up a node in a given location -- interactive
     private void initialise() {
         File paramsFile = new File(paramsFilePath);
         if (paramsFile.exists()){
-            System.out.println("--> \u001B[31m[warning]\u001B[30m initialised ETB node already exists at this location (use -h to see more options)");
+            System.out.println("=> \u001B[31m[error]\u001B[30m an ETB node already initialised at this location (use -h to see more options)");
         }
         else {
             while (true) {
-                System.out.print("--> provide port : ");
+                System.out.print("-> provide port : ");
                 Scanner in = new Scanner(System.in);
                 try {
                     this.port = Integer.valueOf(in.nextLine());
@@ -77,7 +76,7 @@ public class etbNode {
                 }
             }
             while (true) {
-                System.out.print("--> provide git repo : ");
+                System.out.print("-> provide git repo : ");
                 Scanner in = new Scanner(System.in);
                 this.repoDirPath = in.nextLine();
                 File repoDir = new File(repoDirPath);
@@ -97,22 +96,21 @@ public class etbNode {
                 }
             }
             save();
-            System.out.println("ETB node initialised (use -h to see more options to update the node)");
+            System.out.println("=> ETB node initialised (use -h to see more options to update the node)");
         }
     }
 
+    //sets up a node in a given location -- with a config file
     public void initialise(String initFilePath) {
         File paramsFile = new File(paramsFilePath);
         if (paramsFile.exists()){
-            System.out.println("--> \u001B[31m[warning]\u001B[30m initialised ETB node already exists at this location (use -h to see more options)");
+            System.out.println("=> \u001B[31m[error]\u001B[30m an ETB node already initialised at this location (use -h to see more options)");
             return;
         }
         
         try {
             JSONParser parser = new JSONParser();
-            //Object serviceSpecObj = parser.parse(new FileReader(initFilePath));
             JSONObject initSpecJSON = (JSONObject) parser.parse(new FileReader(initFilePath));
-            
             String port0 = (String) initSpecJSON.get("port");
             try {
                 this.port = Integer.valueOf(port0.trim());
@@ -134,7 +132,7 @@ public class etbNode {
                     this.repoDirPath = repoDirCan.getAbsolutePath();
                 }
                 catch (IOException e) {
-                    System.out.println("\u001B[31m[error]\u001B[30m canonical path for file not found");
+                    System.out.println("\u001B[31m[error]\u001B[30m please provide a valid path");
                     System.out.println(e.getMessage());
                 }
             }
@@ -143,7 +141,7 @@ public class etbNode {
             }
             
             save();
-            System.out.println("ETB node initialised (use -h to see more options to update the node)");
+            System.out.println("=> ETB node initialised (use -h to see more options to update the node)");
 
             
         } catch (IOException e) {
@@ -154,55 +152,101 @@ public class etbNode {
         
     }
     
+    //sets port number and repoDir path for the node
     private void instantiate() {
         try {
             JSONParser parser = new JSONParser();
-            nodeParamsJSONObj = (JSONObject) parser.parse(new FileReader(this.paramsFilePath));
+            JSONObject nodeParamsJSONObj = (JSONObject) parser.parse(new FileReader(this.paramsFilePath));
+            this.port = Integer.valueOf(nodeParamsJSONObj.get("port").toString());
+            this.repoDirPath = (String) nodeParamsJSONObj.get("repoDirPath");
         } catch (FileNotFoundException e) {
-            System.out.println("\u001B[31m[error]\u001B[30mno ETB node at this location (use -init to initialise an ETB node)");
+        	System.out.println("\u001B[31m[error]\u001B[30m no ETB node at this location (use -init to initialise an ETB node)");
+        	//System.out.println("\u001B[31m[paramsFilePath]\u001B[30m : " + paramsFilePath);
             System.exit(0);
         } catch (IOException | ParseException e) {
             e.printStackTrace();
+            System.out.println("\u001B[31m[error]\u001B[30m init file can not be read (use -uninit to re-initialise an ETB node)");
+            System.exit(0);
         }
-        
-        port = Integer.valueOf(nodeParamsJSONObj.get("port").toString());
-        repoDirPath = (String) nodeParamsJSONObj.get("repoDirPath");
-        
     }
-
+    
+    //sets all components, including the basic 4 components, of an ETB node
     private void populate() {
-        
-        servicePack = new servicePackage((JSONArray) nodeParamsJSONObj.get("servicePack"));
-        serversPack = new serversPackage((JSONArray) nodeParamsJSONObj.get("servers"));
-        workflowsPack = new workFlowsPackage(repoDirPath, (JSONArray) nodeParamsJSONObj.get("workflows"));
-        claims = new claimsPack((JSONArray) nodeParamsJSONObj.get("claims"));
-        
+        try {
+            JSONParser parser = new JSONParser();
+            JSONObject nodeParamsJSONObj = (JSONObject) parser.parse(new FileReader(this.paramsFilePath));
+            
+            this.port = Integer.valueOf(nodeParamsJSONObj.get("port").toString());
+            this.repoDirPath = (String) nodeParamsJSONObj.get("repoDirPath");
+            
+            this.servicePack = new servicePackage((JSONArray) nodeParamsJSONObj.get("servicePack"));
+            this.serversPack = new serversPackage((JSONArray) nodeParamsJSONObj.get("servers"));
+            this.workflowsPack = new workFlowsPackage(repoDirPath, (JSONArray) nodeParamsJSONObj.get("workflows"));
+            this. claims = new claimsPack((JSONArray) nodeParamsJSONObj.get("claims"));
+
+        } catch (FileNotFoundException e) {
+            System.out.println("\u001B[31m[error]\u001B[30mno ETB node at this location (use -init to initialise an ETB node)");
+            System.out.println("\u001B[31m[paramsFilePath]\u001B[30m : " + paramsFilePath);
+            System.exit(0);
+        } catch (IOException | ParseException e) {
+            e.printStackTrace();
+            System.out.println("\u001B[31m[error]\u001B[30m init file can not be read (use -uninit to re-initialise an ETB node)");
+            System.exit(0);
+        }
     }
 
+    //cleans wrapper files
+    private void clean() {
+        File wrappersSrc = new File("wrappers");
+        File wrappersBin = new File("etb/wrappers");
+        try {
+            FileUtils.cleanDirectory(wrappersSrc);
+            FileUtils.cleanDirectory(wrappersBin);
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.out.println("\u001B[31m[warning]\u001B[30m problem while cleaning wrapper files");
+        }
+    }
+    
+    //cleans init file and wrapper files
+    private void cleanAll() {
+        clean();
+        File initFile = new File("params.json");
+        try {
+            FileUtils.forceDelete(initFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.out.println("\u001B[31m[warning]\u001B[30m problem while deleting initialisation file");
+        }
+    }
+    
     public void run(String args[]) {
-        if (args.length == 1) {
+        if (args.length == 0) {
+            populate();
+            serverMode SM = new serverMode();
+            SM.run(this, repoDirPath, port);
+        }
+        else if (args.length == 1) {
+            
             if (args[0].equals("-init")) {
                 initialise();
-                System.exit(1);
             }
             else if (args[0].equals("-uninit")) {
-                utils.runCMD0("rm -f etb/wrappers/* wrappers/* " + paramsFilePath);
-                servicePack.generateDefaultBridgeFile();
-                System.exit(1);
+                cleanAll();
+                System.out.println("=> node uninitialised successfully");
+                //utils.runCMD0("rm -f etb/wrappers/* wrappers/* " + paramsFilePath);
             }
             else if (args[0].equals("-clean")) {
-                utils.runCMD0("rm -f etb/wrappers/* wrappers/*");
-                servicePack.generateDefaultBridgeFile();
-                instantiate();
+                instantiate(); //leaving the 4 core ETB components empty
+                clean();
+                System.out.println("=> node cleaned successfully");
+                //utils.runCMD0("rm -f etb/wrappers/* wrappers/*");
                 save();
-                System.exit(1);
             }
             else if (args[0].equals("-help") || args[0].equals("-h")){
                 help();
-                System.exit(1);
             }
             else {
-                instantiate();
                 populate();
                 if (args[0].equals("-node-info")){
                     System.out.println(this);
@@ -221,18 +265,16 @@ public class etbNode {
                 else {
                     System.out.println("ERROR. Unknown option: " + args[0]);
                 }
-                System.exit(0);
             }
         }
         
         else if (args.length == 2 && args[0].equals("-init")) {
                 initialise(args[1]);
-                System.exit(1);
         }
         
         else if (args.length == 2) {
-            instantiate();
             populate();
+            //TODO: giving query as an input (subsumed by claim addition?)
             if (args[0].equals("-query")){
                 //directly processing a query
                 List<String> serviceArgs = inQuery2Params(args[1]);
@@ -259,7 +301,6 @@ public class etbNode {
                     qo.writeResult2(answers);
                 }
             }
-            
             else if (args[0].equals("-set-port")){
                 try {
                     this.port =  Integer.valueOf(args[1]);
@@ -270,7 +311,7 @@ public class etbNode {
                 }
             }
             else if (args[0].equals("-set-repo")){
-                setWorkingDirectory(args[1]);
+                setRepoDir(args[1]);
             }
             else if (args[0].equals("-add-claim")){
                 claims.add(args[1], servicePack.getServices(), workflowsPack, repoDirPath, this);
@@ -314,20 +355,20 @@ public class etbNode {
                 System.out.println("ERROR. Unknown option: " + args[0]);
             }
         }
+
         else {
             System.out.println("ERROR. Incorrect Workflow argument(s) structure");
         }
     }
     
-    private void setWorkingDirectory(String inDirPath) {
+    private void setRepoDir(String inDirPath) {
         File repoDir = new File(inDirPath);
         if (repoDir.exists() && repoDir.isDirectory()){
-            //this.repoDirPath = inDirPath;
             try {
                 File repoDirCanonical = new File(repoDir.getCanonicalPath());
                 this.repoDirPath = repoDirCanonical.getAbsolutePath();
-                save();
                 System.out.println("working directory successfully set");
+                save();
             }
             catch (IOException e) {
                 System.out.println("\u001B[31m[error]\u001B[30m canonical path for file not found");
@@ -339,6 +380,10 @@ public class etbNode {
         }
     }
 
+    public void addClaim(int ID, claimSpec claim) {
+        claims.add(ID, claim);
+    }
+    
     private void help() {
         System.out.println("\nOverview:  ETB 2.0 - Evidential Tool Bus (Linux 64-bit version)\n");
         System.out.println("Usage:     etb2 [options] <inputs>\n");
@@ -395,196 +440,7 @@ public class etbNode {
             e.printStackTrace();
         }
     }
-    
-    public static String getFile(String claimWorkingDir, String fileName, DataInputStream fromClientData) throws IOException {
-        //needs to check first if claim already exists in the server
-        //then the computation follows
-        
-        fileName = claimWorkingDir + "/temp_" + (new File(claimWorkingDir).list().length + 1) + "_" + fileName;
 
-        File fout = new File(fileName);
-        FileOutputStream fos = new FileOutputStream(fout);
-        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
-        
-        String line;
-        while(!(line = fromClientData.readUTF()).equals("EOF")) {
-            bw.write(line);
-            bw.newLine();
-        }
-        bw.close();
-        fos.close();
-        return fileName;
-    }
-    
-    public void serverRun() {
-        instantiate();
-        populate();
-        while (true) {
-            System.out.println(this);
-            System.out.println("waiting for a client ...");
-            try (
-                 ServerSocket serverSocket = new ServerSocket(this.port);
-                 Socket clientSocket = serverSocket.accept();
-
-                 InputStream inStr = clientSocket.getInputStream();
-                 DataInputStream fromClientData = new DataInputStream(inStr);
-                 OutputStream outStr = clientSocket.getOutputStream();
-                 DataOutputStream toClientData = new DataOutputStream(outStr);
-                 
-                 ) {
-                System.out.println("connected to client : " + clientSocket.getInetAddress().getHostAddress());
-                String request;
-                if ((request = fromClientData.readUTF()) == null) {
-                    System.out.println("null request found (liveness check?)");
-                }
-                
-                else if (request.equals("regstReqst")){
-                    System.out.println("this is a service registration request");
-                    System.out.println("request being processed ... ");
-                    //TODO: --> announce all the services I provide
-                    System.out.println("request procssing done");
-                    toClientData.writeUTF(servicePack.getNames());
-                }
-                
-                else if (request.equals("execReqst")){
-                    System.out.println("=> request received for service execution");
-
-                    //reading service details from client
-                    String serviceName = fromClientData.readUTF();
-                    System.out.println("-> serviceName : " + serviceName);
-                    String serviceInvMode = fromClientData.readUTF();
-                    System.out.println("-> serviceInvMode : " + serviceInvMode);
-
-                    //reading service args from client
-                    List<String> serviceArgs = getArgsFromClient(fromClientData, toClientData);
-                    System.out.println("-> serviceArgs : " + serviceArgs.toString());
-                    
-                    serviceInvocation inv = new serviceInvocation(new Expr(serviceName, serviceArgs));
-                    inv.process(this);
-                    System.out.println("-> service execution done");
-                    
-                    //sending back result
-                    System.out.println("-> execution result: " + inv.getResult());
-                    List<String> resultArgs = inv.getResult().getTerms();
-
-                    Iterator<String> resultIter = resultArgs.iterator();
-                    while (resultIter.hasNext()) {
-                        toClientData.writeUTF(resultIter.next());
-                    }
-                    toClientData.writeUTF("done");
-                    toClientData.writeUTF(inv.getEvidence());
-
-                    claimSpec newClaim = new claimSpec(inv.getResult());
-                    newClaim.generateSHA1(repoDirPath);
-                    //newClaim.addAnswer(inv.getBindings());
-                    claims.add(newClaim);
-                    
-                    save();
-                }
-                
-                else if (request.equals("statusCheck")){
-                    System.out.println("request received for availability check");
-                }
-                
-                else {
-                    System.out.println("unknown request type");
-                }
-                clientSocket.close();
-                serverSocket.close();
-            } catch (IOException e) {
-                System.out.println("error while trying to listen on port " + this.port + " or connection error");
-                System.out.println(e.getMessage());
-            }
-        }
-    }
-
-    private List<String> getArgsFromClient(DataInputStream fromClientData, DataOutputStream toClientData) throws IOException {
-        List<String> serviceArgs = new ArrayList();
-        
-        //setting up a directory to save temporary files
-        String claimWorkingDirPath = repoDirPath + "/TEMP";
-        File claimWorkingDir = new File(claimWorkingDirPath);
-        if (!claimWorkingDir.isDirectory()) {
-            claimWorkingDir.mkdir();
-        }
-        claimWorkingDirPath += "/claim" + (claimWorkingDir.list().length + 1);
-        claimWorkingDir = new File(claimWorkingDirPath);
-        claimWorkingDir.mkdir();
-        
-        String serviceArgType;
-        while(!(serviceArgType = fromClientData.readUTF()).equals("done")) {
-            System.out.println("serviceArgType : " + serviceArgType);
-            if (serviceArgType.equals("file_list")) {
-                //argument is list of files
-                System.out.println("-> a list of files as arg");
-                String eachFilePath, listRead = "listIdent";
-                while(!(eachFilePath = fromClientData.readUTF()).equals("file_list_done")) {
-                    //System.out.println("\t -> file : " + listElement);
-                    //String eachFilePath = listElement;
-                    System.out.println("\t\t -> file : " + eachFilePath);
-                    String SHA1 = fromClientData.readUTF();
-                    System.out.println("\t\t -> file SHA1 : " + SHA1);
-                    if (utils.existsInRepo(eachFilePath, repoDirPath)) {
-                        System.out.println("\t\t -> file in server repo");
-                        if (utils.getSHA1(eachFilePath).equals(SHA1)) {
-                            System.out.println("\t\t -> SHA1 matches");
-                            toClientData.writeUTF("done");
-                        }
-                        else {
-                            System.out.println("\t\t -> SHA1 does not match");
-                            toClientData.writeUTF("sendMeCopy");
-                            File eachFile = new File(eachFilePath);
-                            eachFilePath = getFile(claimWorkingDirPath, eachFile.getName(), fromClientData);
-                        }
-                    }
-                    else {
-                        System.out.println("\t\t -> file NOT in server repo");
-                        toClientData.writeUTF("sendMeCopy");
-                        File eachFile = new File(eachFilePath);
-                        eachFilePath = getFile(claimWorkingDirPath, eachFile.getName(), fromClientData);
-                    }
-                    listRead += " file(" + eachFilePath + ")";
-                }
-                System.out.println("new argument after reading files : " + listRead);
-                serviceArgs.add(listRead);
-            }
-            else if (serviceArgType.equals("file")) {
-                System.out.println("-> a file as arg");
-                String fileElement = fromClientData.readUTF();
-                System.out.println("\t -> file : " + fileElement);
-                String SHA1 = fromClientData.readUTF();
-                System.out.println("\t -> file SHA1 : " + SHA1);
-                
-                if (utils.existsInRepo(fileElement, repoDirPath)) {
-                    System.out.println("\t\t -> file in server repo");
-                    if (utils.getSHA1(fileElement).equals(SHA1)) {
-                        System.out.println("\t\t -> SHA1 matches");
-                        toClientData.writeUTF("done");
-                    }
-                    else {
-                        System.out.println("\t\t -> SHA1 does not match");
-                        toClientData.writeUTF("sendMeCopy");
-                        File eachFile = new File(fileElement);
-                        //fileElement = getFile(eachFile.getName(), fromClientData);
-                        fileElement = getFile(claimWorkingDirPath, eachFile.getName(), fromClientData);
-                    }
-                }
-                else {
-                    System.out.println("\t\t -> file NOT in server repo");
-                    toClientData.writeUTF("sendMeCopy");
-                    File eachFile = new File(fileElement);
-                    //fileElement = getFile(eachFile.getName(), fromClientData);
-                    fileElement = getFile(claimWorkingDirPath, eachFile.getName(), fromClientData);
-                }
-                serviceArgs.add("file(" + fileElement + ")");
-            }
-            else {
-                serviceArgs.add(fromClientData.readUTF());
-            }
-        }
-        return serviceArgs;
-    }
-    
     public static List<String> inQuery2Params(String inQuery) {
         List<String> serviceArgs = new ArrayList();
         int commasCount = inQuery.replaceAll("[^,]","").length();
@@ -607,14 +463,7 @@ public class etbNode {
     
     public static void main(String args[]){
         etbNode FW = new etbNode();
-        if (args.length == 0) {
-            //running as a server
-            FW.serverRun();
-        }
-        else {
-         FW.run(args);
-        }
-
+        FW.run(args);
     }
 
 }

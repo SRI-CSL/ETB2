@@ -116,7 +116,7 @@ public class serviceSpec {
         
         String etbWrapperFilePath = System.getProperty("user.dir") + "/wrappers/" + ID + "ETBWRP.java";
         String etbWrapperClass = "/*\n an auto-generated ETB wrapper template for the service '" + ID + "'\n*/";
-        etbWrapperClass += "\n\npackage etb.wrappers;\n\nimport java.util.ArrayList;\nimport etb.etbDL.services.genericWRP;";
+        etbWrapperClass += "\n\npackage etb.wrappers;\n\nimport java.util.ArrayList;\nimport etb.wrappers.genericWRP;";
         etbWrapperClass += "\n\npublic abstract class " + ID + "ETBWRP extends genericWRP {";
         etbWrapperClass += inVarsDecl + outVarsDecl + initBody + listRetMethods + strRetMethods + "\n}";
         

@@ -7,9 +7,7 @@ import org.json.simple.JSONArray;
 
 
 import etb.etbDL.utils.Expr;
-import etb.etbDL.services.*;
 import etb.etbDL.output.*;
-import etb.etbCS.clientMode;
 
 
 public class querySpec {

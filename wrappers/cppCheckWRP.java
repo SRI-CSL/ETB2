@@ -16,6 +16,7 @@ import org.json.simple.parser.ParseException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.io.File;
+import org.apache.commons.io.FileUtils;
 
 import org.json.XML;
 import java.io.*;
@@ -24,11 +25,31 @@ public class cppCheckWRP extends cppCheckETBWRP {
 
 	@Override
 	public void run(){
+        
 		if (mode.equals("+-")) {
-			//do something
-            apply();
             
-		}
+            out2 = workSpaceDirPath + "/cppCheckRes.json";
+            try {
+                FileUtils.copyDirectory(new File(in1).getAbsoluteFile().getParentFile(), new File(workSpaceDirPath));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            
+            runCMD0("cd " + workSpaceDirPath + " && cppcheck --xml-version=2 --enable=all " + new File(in1).getName() + " 2> cppcheck.xml");
+            String xmlStrOUT = getFileContent(workSpaceDirPath + "/cppcheck.xml");
+            String jsonStrOUT = xml2json(xmlStrOUT);
+            
+            try {
+                FileWriter fw = new FileWriter(out2);
+                fw.write(getErrors(jsonStrOUT).toJSONString());
+                fw.flush();
+                fw.close();
+                
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }
 		else {
 			System.out.println("unrecognized mode for cppCheck");
 		}
@@ -93,18 +114,10 @@ public class cppCheckWRP extends cppCheckETBWRP {
         }
     }
     
-    private void apply(){
+    private JSONArray getErrors(String jsonStrOUT){
         
-        File SourceFile = new File(in1);
-        String FILEBASE = SourceFile.getName();
-        String FILEDIR = SourceFile.getParent();
-        
-        runCMD0("cd " + FILEDIR + " && cppcheck --xml-version=2 --enable=all " + FILEBASE + " 2> cppcheck.xml");
-        String xmlStrOUT = getFileContent(FILEDIR + "/cppcheck.xml");
-        String jsonStrOUT = xml2json(xmlStrOUT);
         JSONParser parser = new JSONParser();
         JSONArray PartErrors = new JSONArray();
-        
         try {
             Object ObjOUT = parser.parse(jsonStrOUT);
             JSONObject jsonObjOUT = (JSONObject) ObjOUT;
@@ -139,7 +152,6 @@ public class cppCheckWRP extends cppCheckETBWRP {
                 
                 if (line == null) {
                     //System.out.println("No line number for the error ***");
-                    
                 }
                 else {
                     Pattern pattern = Pattern.compile("Possible null pointer dereference: (?:(\\w+))");
@@ -205,17 +217,7 @@ public class cppCheckWRP extends cppCheckETBWRP {
             e.printStackTrace();
         }
         
-        //return PartErrors;
-        out2 = FILEDIR + "/cppCheckRes.json";
-        try {
-            FileWriter fw = new FileWriter(out2);
-            fw.write(PartErrors.toJSONString());
-            fw.flush();
-            fw.close();
-            
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        return PartErrors;
         
     }
 }

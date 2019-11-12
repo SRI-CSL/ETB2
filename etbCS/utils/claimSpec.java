@@ -42,10 +42,20 @@ public class claimSpec {
         this.repoDirPath = repoDirPath;
     }
     
+    public claimSpec(Expr query, Collection<Map<String, String>> answers, String repoDirPath) {
+        this.query = query;
+        this.answers = answers;
+        this.qClaim = query.substitute(answers.iterator().next());
+        generateSHA1(repoDirPath);
+        this.workFlowID = "";
+        this.repoDirPath = repoDirPath;
+    }
+
     public claimSpec(JSONObject claimSpecJSON) {
         this.query = new Expr((JSONObject) claimSpecJSON.get("query"));
         this.qClaim = new Expr((JSONObject) claimSpecJSON.get("qClaim"));
         JSONArray answersJSON = (JSONArray) claimSpecJSON.get("answers");
+        
         Iterator<JSONObject> answersIter = answersJSON.iterator();
         while (answersIter.hasNext()) {
             JSONObject eachAnswerJSON = (JSONObject) answersIter.next();
@@ -57,6 +67,7 @@ public class claimSpec {
             }
             this.answers.add(answerMap);
         }
+        
         JSONArray derivRulesJSON = (JSONArray) claimSpecJSON.get("derivRules");
         Iterator<JSONObject> derivRulesIter = derivRulesJSON.iterator();
         while (derivRulesIter.hasNext()) {
@@ -83,7 +94,6 @@ public class claimSpec {
         }
         this.workFlowID = (String) claimSpecJSON.get("workFlowID");
         this.workFlowSHA1 = (String) claimSpecJSON.get("workFlowSHA1");
-        
     }
     
     public Collection<Map<String, String>> getQueryAnswers() {
@@ -192,7 +202,8 @@ public class claimSpec {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("\n--> hashCode : " + query.hashCode());
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n--> hashCode : " + query.hashCode());
         sb.append("\n--> qClaim : " + qClaim);
         sb.append("\n--> query : " + query.toString());
         sb.append("\n--> workFlowID : " + workFlowID);

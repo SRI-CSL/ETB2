@@ -5,7 +5,7 @@
 package etb.wrappers;
 
 import java.util.ArrayList;
-import etb.etbDL.services.genericWRP;
+//import etb.etbDL.services.genericWRP;
 
 public abstract class cppCheckETBWRP extends genericWRP {
 	//input variables declaration
@@ -26,6 +26,7 @@ public abstract class cppCheckETBWRP extends genericWRP {
 		//output variables default instantiation
 		out1 = in1;
 		out2 = in2;
+        
 	}
 
 	@Override

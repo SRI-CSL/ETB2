@@ -3,7 +3,7 @@ package etb.etbCS.utils;
 import java.util.*;
 import java.util.HashMap;
 import etb.etbDL.utils.Expr;
-import etb.etbDL.services.*;
+import etb.wrappers.*;
 import etb.etbDL.output.*;
 import etb.etbCS.clientMode;
 import etb.etbCS.etbNode;
@@ -11,10 +11,9 @@ import etb.etbCS.etbNode;
 public class serviceInvocation {
 
     Expr query;
-    
-    Expr result;
+    Expr result; //TODO: for more than one results per query
     String evidence = null;
-    //Map<String, String> bindings = new HashMap();
+    boolean local = false;
     
     public serviceInvocation(Expr query) {
         this.query = query;
@@ -27,7 +26,8 @@ public class serviceInvocation {
         if (servicePack.containsService(serviceID)) {
             System.out.println("\t -> query processing as a local service");
             System.out.println(servicePack.get(serviceID).toString());
-            invoke(query, servicePack.get(serviceID).getSignature());
+            invoke(query, servicePack.get(serviceID).getSignature(), node.getRepoDirPath());
+            local = true;
         }
         else {
             //getting all servers providing the service requested in the query
@@ -42,8 +42,7 @@ public class serviceInvocation {
                 if (cm.isConnected()) {
                     this.result = cm.remoteServiceExecution(query, node.getRepoDirPath());
                     this.evidence = cm.getEvidence();
-                    //result.unify(query, this.bindings);
-                    //TODO: May be special tactic/heuristic?
+                    //TODO: special tactic/heuristic for more servers per service?
                     break;
                 }
             }
@@ -57,25 +56,24 @@ public class serviceInvocation {
     public String getEvidence() {
         return evidence;
     }
-    /*
-    public Map<String, String> getBindings(){
-        return bindings;
-    }
-    */
-    private void invoke(Expr query, String signature) {
+   
+    private void invoke(Expr query, String signature, String repoDirPath) {
         try {
             Class<?> wrapperClass = Class.forName("etb.wrappers." + query.getPredicate() + "WRP");
             Object wrapper = wrapperClass.newInstance();
             genericWRP genWRP = (genericWRP) wrapper;
-            genWRP.invoke(query.getMode(), query.getTerms());
+            genWRP.invoke(query.getMode(), query.getTerms(), repoDirPath + "/TEMP/" + query.getPredicate());
             this.result = new Expr(query.getPredicate(), genWRP.getOutParams(), signature, query.getMode());
             this.evidence = genWRP.getEvidence();
-            //result.unify(query, this.bindings);
 
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
             System.out.println("\u001B[31mmissing service wrapper\u001B[30m please check '" + query.getPredicate()+ "' service)");
             e.printStackTrace();
         }
+    }
+    
+    public boolean isLocal() {
+        return local;
     }
     
     @Override

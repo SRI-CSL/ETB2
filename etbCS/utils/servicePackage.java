@@ -9,7 +9,6 @@ import org.json.simple.parser.ParseException;
 import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
 import etb.etbDL.statements.etbDLParser;
-import etb.etbDL.services.*;
 import etb.etbDL.utils.*;
 import etb.etbDL.output.*;
 
@@ -80,7 +79,7 @@ public class servicePackage {
             toAdd.generateWrappers();
             services.put(ID, toAdd);
             
-            updateExternPredBridgeFile();
+            //updateExternPredBridgeFile();
             
             System.out.println("=> service added successfully");
             
@@ -114,7 +113,7 @@ public class servicePackage {
         services.remove(ID);
         removeWrappers(ID);
         System.out.println("=> service removed successfully");
-        updateExternPredBridgeFile();
+        //updateExternPredBridgeFile();
     }
 
     public String getNames() {
@@ -140,76 +139,6 @@ public class servicePackage {
         return services.get(serviceID);
     }
     
-    private void updateExternPredBridgeFile() {
-        
-        if (services.size() == 0) {
-            generateDefaultBridgeFile();
-            return;
-        }
-        
-        String filePath = System.getProperty("user.dir") + "/etbDL/services/externPred2ServiceInstance.java";
-        try {
-            FileWriter NewFileFW = new FileWriter(filePath);
-            NewFileFW.write("/*\n implements a bridge method that links queries to external services (external predicates) with corresponding service invocation (auto-generated code)\n*/");
-            NewFileFW.write("\n\npackage etb.etbDL.services;");
-            //NewFileFW.write("\nimport java.util.List;");
-            NewFileFW.write("\nimport etb.wrappers.*;");
-            NewFileFW.write("\n\npublic class externPred2ServiceInstance extends externPred2Service {");
-            NewFileFW.write("\n\t@Override");
-            //NewFileFW.write("\n\tpublic genericWRP getGroundParams(String toolName, List<String> args, String mode) {");
-            NewFileFW.write("\n\tpublic genericWRP getGroundParams(String toolName) {");
-            NewFileFW.write("\n\t\tgenericWRP genWRP = null;");
-            
-            Iterator<String> it = services.keySet().iterator();
-            String toolName = it.next();
-            NewFileFW.write("\n\t\tif(toolName.equals(\"" + toolName + "\")){");
-            NewFileFW.write("\n\t\t\tgenWRP = new " + toolName + "WRP();");
-            NewFileFW.write("\n\t\t}");
-            
-            while(it.hasNext()) {
-                toolName = it.next();
-                NewFileFW.write("\n\t\telse if(toolName.equals(\"" + toolName + "\")){");
-                NewFileFW.write("\n\t\t\tgenWRP = new " + toolName + "WRP();");
-                NewFileFW.write("\n\t\t}");
-            }
-            
-            NewFileFW.write("\n\t\telse{");
-            NewFileFW.write("\n\t\t\tSystem.out.println(\"no external service found with name: \" + toolName);");
-            NewFileFW.write("\n\t\t}");
-            NewFileFW.write("\n\t\treturn genWRP;");
-            NewFileFW.write("\n\t}");
-            NewFileFW.write("\n}");
-            NewFileFW.flush();
-            NewFileFW.close();
-            
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        utils.runCMD0("cd " + System.getProperty("user.dir") + " && javac -d .  etbDL/services/externPred2ServiceInstance.java");
-    }
-    
-    public void generateDefaultBridgeFile() {
-        String filePath = System.getProperty("user.dir") + "/etbDL/services/externPred2ServiceInstance.java";
-        try {
-            FileWriter NewFileFW = new FileWriter(filePath);
-            NewFileFW.write("/*\n implements a mechanism for translating external predicates to corresponding tool invocation (auto-generated code)\n*/");
-            NewFileFW.write("\n\npackage etb.etbDL.services;");
-            NewFileFW.write("\nimport java.util.ArrayList;");
-            NewFileFW.write("\n\npublic class externPred2ServiceInstance extends externPred2Service {");
-            NewFileFW.write("\n\t@Override");
-            NewFileFW.write("\n\tpublic genericWRP getGroundParams(String toolName, ArrayList<String> args, String mode) {");
-            NewFileFW.write("\n\n\t\treturn null;");
-            NewFileFW.write("\n\t}");
-            NewFileFW.write("\n}");
-            NewFileFW.flush();
-            NewFileFW.close();
-            
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        utils.runCMD0("cd " + System.getProperty("user.dir") + " && javac -d .  etbDL/services/externPred2ServiceInstance.java");
-    }
-
     private void removeWrappers(String serviceID) {
         utils.runCMD0("cd " + System.getProperty("user.dir") + "/wrappers/ && rm -f " + serviceID + "WRP.java " + serviceID + "ETBWRP.java");
         utils.runCMD0("cd " + System.getProperty("user.dir") + "/etb/wrappers/ && rm -f " + serviceID + "WRP.class " + serviceID + "ETBWRP.class");
