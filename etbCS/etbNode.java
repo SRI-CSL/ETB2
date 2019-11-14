@@ -289,8 +289,10 @@ public class etbNode {
                 if (!SourceFileObj.exists()) {
                     System.out.println("error: problem with the script file!");
                 }
-                etbDatalog dlPack = new etbDatalog();
-                dlPack.parseDatalogScript(scriptFile, repoDirPath);
+                //etbDatalog dlPack = new etbDatalog();
+                //dlPack.parseDatalogScript(scriptFile, repoDirPath);
+                etbDatalog dlPack = etbDLParser.parseDatalogScript(scriptFile, repoDirPath);
+
                 etbDatalogEngine dlEngine = new etbDatalogEngine();
                 Collection<Map<String, String>> answers = dlEngine.run(this, dlPack);
                 if (answers == null) {

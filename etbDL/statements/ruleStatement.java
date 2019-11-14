@@ -5,18 +5,19 @@ import java.util.Map;
 
 import etb.etbDL.etbDatalog;
 import etb.etbDL.utils.DatalogException;
-import etb.etbDL.utils.Expr;
+import etb.etbDL.utils.Rule;
 
-class factStatement implements etbDLStatement {
-
-	private final Expr fact;
+public class ruleStatement implements etbDLStatement {
 	
-	public factStatement(Expr fact) {
-		this.fact = fact;
+	private final Rule rule;
+	
+	public ruleStatement(Rule rule) {
+		this.rule = rule;
 	}
-
+    
     @Override
     public void addTo(etbDatalog datalog) throws DatalogException {
-        datalog.addFact(fact);
-    }
+        //datalog.addRule(rule);
+        datalog.add(rule);
+    }    
 }

@@ -12,46 +12,13 @@ public class etbDatalog {
     Collection<Rule> intDB = new ArrayList<>();
     extDataBaseSuit extDB = new extDataBaseSuit();
     
-    public etbDatalog() {
-        
-    }
+    public etbDatalog() {}
 
     public etbDatalog(List<Rule> rules, List<Expr> facts) {
         for(Rule rule : rules)
-            addRule(rule);
+            add(rule); //addRule(rule);
         for(Expr fact : facts)
-            addFact(fact);
-    }
-
-    private static StreamTokenizer getTokenizer(Reader reader) throws IOException {
-		StreamTokenizer scan = new StreamTokenizer(reader);
-		scan.ordinaryChar('.'); // assumed number by default
-		scan.commentChar('%'); // % comments will be ignored
-		scan.quoteChar('"');
-		scan.quoteChar('\'');
-		return scan;
-	}
-    
-    public void parseDatalogScript(String scriptFile, String repoDirPath) {
-        try {
-            Reader reader = new BufferedReader(new FileReader(scriptFile));
-            StreamTokenizer scan = getTokenizer(reader);
-            scan.nextToken();
-            while(scan.ttype != StreamTokenizer.TT_EOF) {
-                scan.pushBack();
-                //each line being parsed and a corresponding statement constructed
-                try {
-                    etbDLStatement statement = etbDLParser.parseStmt(scan, repoDirPath);
-                    statement.addTo(this);
-                } catch (DatalogException e) {
-                    System.out.println("[line " + scan.lineno() + "] Error executing statement");
-                    e.printStackTrace();
-                }
-                scan.nextToken();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+            add(fact); //addFact(fact);
     }
 
     public void validate() throws DatalogException {
@@ -63,7 +30,7 @@ public class etbDatalog {
 		}
     }
     
-    public void addRule(Rule newRule) {
+    public void add(Rule newRule) {
         try {
             newRule.validate();
             intDB.add(newRule);
@@ -72,7 +39,7 @@ public class etbDatalog {
         }
     }
 
-    public void addFact(Expr newFact) {
+    public void add(Expr newFact) {
         if(!newFact.isGround()) {
             //throw new DatalogException("Facts must be ground: " + newFact);
             DatalogException e = new DatalogException("Facts must be ground: " + newFact);
@@ -85,7 +52,6 @@ public class etbDatalog {
         }
         //TODO: matching arity against existing facts
         extDB.add(newFact);
-        //return this;
     }
     
     @Override

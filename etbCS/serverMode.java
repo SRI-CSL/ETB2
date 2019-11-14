@@ -14,7 +14,6 @@ import java.io.*;
 import etb.etbCS.utils.*;
 import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
-import etb.etbDL.statements.etbDLParser;
 import etb.etbDL.utils.*;
 import etb.etbDL.output.*;
 

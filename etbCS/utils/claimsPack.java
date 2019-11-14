@@ -98,8 +98,10 @@ public class claimsPack {
         List<String> applWorkflows = wfPack.getWorkflows(claimExpr.queryHashCode());
         System.out.println("=> number of matching applicable workflows: " + applWorkflows.size());
         for (String workFlowID : applWorkflows) {
-            etbDatalog dlPack = new etbDatalog();
-            dlPack.parseDatalogScript(workflows.get(workFlowID).getScriptPath(), repoDirPath);
+            //etbDatalog dlPack = new etbDatalog();
+            //dlPack.parseDatalogScript(workflows.get(workFlowID).getScriptPath(), repoDirPath);
+            etbDatalog dlPack = etbDLParser.parseDatalogScript(workflows.get(workFlowID).getScriptPath(), repoDirPath);
+
             etbDatalogEngine dlEngine = new etbDatalogEngine(claimExpr);
             Collection<Map<String, String>> answers;
             if ((answers = dlEngine.run(etcSS, dlPack)) == null) {

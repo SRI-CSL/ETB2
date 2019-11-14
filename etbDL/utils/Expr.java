@@ -7,9 +7,8 @@ import java.util.Iterator;
 import java.util.Map;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONArray;
-
+import java.util.regex.Pattern;
 import etb.etbDL.engine.Indexable;
-import etb.etbDL.statements.etbDLParser;
 
 //represents a Datalog literal, which is a predicate followed by zero or more terms, e.g., pred(term1, term2, term3...).
 //number of terms is the expression's <i>arity</i>.
@@ -320,7 +319,7 @@ public class Expr implements Indexable<String> {
                 bindings.put(term2, term1);
                 return true;
             } else {
-				if (etbDLParser.tryParseDouble(term1) && etbDLParser.tryParseDouble(term2)) {
+                if (tryParseDouble(term1) && tryParseDouble(term2)) {
 					double d1 = Double.parseDouble(term1);
 					double d2 = Double.parseDouble(term2);
 					return d1 == d2; //both numbers
@@ -338,7 +337,7 @@ public class Expr implements Indexable<String> {
                 
                 if(predicate.equals("<>")) {
                     // '<>' is also a bit special
-                    if(etbDLParser.tryParseDouble(term1) && etbDLParser.tryParseDouble(term2)) {
+                    if(tryParseDouble(term1) && tryParseDouble(term2)) {
                             double d1 = Double.parseDouble(term1);
                             double d2 = Double.parseDouble(term2);
                             return d1 != d2;
@@ -349,11 +348,11 @@ public class Expr implements Indexable<String> {
                     // Ordinary comparison operator
                 	// If the term doesn't parse to a double it gets treated as 0.0.
                 	double d1 = 0.0, d2 = 0.0;
-                    if(etbDLParser.tryParseDouble(term1)) {
-                    	d1 = Double.parseDouble(term1);
+                    if(tryParseDouble(term1)) {
+                        d1 = Double.parseDouble(term1);
                     }
-                    if(etbDLParser.tryParseDouble(term2)) {
-                    	d2 = Double.parseDouble(term2);
+                    if(tryParseDouble(term2)) {
+                        d2 = Double.parseDouble(term2);
                     }
                     switch(predicate) {
                         case "<": return d1 < d2;
@@ -594,6 +593,14 @@ public class Expr implements Indexable<String> {
                 hash += (signature.charAt(i)+"").hashCode();
         }
         return hash;
+    }
+    
+    //private static final Pattern numberPattern = Pattern.compile("[+-]?\\d+(\\.\\d*)?([Ee][+-]?\\d+)?");
+    
+    /* Checks, via regex, if a String can be parsed as a Double */
+    public static boolean tryParseDouble(String str) {
+        final Pattern numberPattern = Pattern.compile("[+-]?\\d+(\\.\\d*)?([Ee][+-]?\\d+)?");
+        return numberPattern.matcher(str).matches();
     }
     
 }

@@ -23,6 +23,8 @@ public class etbDatalogEngine {
     List<Expr> derivFacts = new ArrayList();
     Map<String, serviceSpec> derivServices = new HashMap();
     
+    public etbDatalogEngine() {}
+
     public etbDatalogEngine(Expr mainGoal) {
         this.mainGoal = mainGoal;
         //initial goal instantiation
@@ -31,9 +33,7 @@ public class etbDatalogEngine {
         //termination for the abstract machine
         this.index = 1;
     }
-
-    public etbDatalogEngine() {}
-
+    
     private void backChain() {
         Iterator<clauseNode> clauseIter = clauses.iterator();
         while (clauseIter.hasNext()) {

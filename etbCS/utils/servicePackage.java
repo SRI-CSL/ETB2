@@ -8,7 +8,6 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import etb.etbDL.etbDatalog;
 import etb.etbDL.etbDatalogEngine;
-import etb.etbDL.statements.etbDLParser;
 import etb.etbDL.utils.*;
 import etb.etbDL.output.*;
 

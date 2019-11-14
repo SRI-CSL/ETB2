@@ -2,6 +2,8 @@ package etb.etbDL.statements;
 
 import java.util.Collection;
 import java.util.Map;
+import etb.etbDL.utils.Rule;
+import etb.etbDL.utils.Expr;
 
 import etb.etbDL.etbDatalog;
 import etb.etbDL.utils.DatalogException;
@@ -41,7 +43,7 @@ public interface etbDLStatement {
 	 * @throws DatalogException if an error occurs in processing the statement
 	 * @see OutputUtils#answersToString(Collection)
 	 */
-    public void addTo(etbDatalog datalog) throws DatalogException;
+    public void addTo(etbDatalog datalog) throws DatalogException;    
     
 	/**
 	 * Shorthand for {@code statement.execute(etbDatalog, null)}.

@@ -6,50 +6,89 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.regex.Pattern;
 import java.io.File;
+import java.io.*;
 
 import etb.etbDL.utils.*;
+import etb.etbDL.etbDatalog;
 
 /**
  * Internal class that encapsulates the parser for the Datalog language.
  */
 public class etbDLParser {
     
+    public static etbDatalog parseDatalogScript(String scriptFile, String repoDirPath) {
+        etbDatalog etbDL = new etbDatalog();
+        try {
+            Reader reader = new BufferedReader(new FileReader(scriptFile));
+            StreamTokenizer scan = getTokenizer(reader);
+            scan.nextToken();
+            while(scan.ttype != StreamTokenizer.TT_EOF) {
+                scan.pushBack();
+                try {
+                    //parses each line to a corresponding statement
+                    etbDLStatement statement = etbDLParser.parseStmt(scan, repoDirPath);
+                    statement.addTo(etbDL);
+                } catch (DatalogException e) {
+                    System.out.println("[line " + scan.lineno() + "] error parsing statement");
+                    e.printStackTrace();
+                    return null;
+                }
+                scan.nextToken();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        return etbDL;
+    }
+    
+    private static StreamTokenizer getTokenizer(Reader reader) throws IOException {
+        StreamTokenizer scan = new StreamTokenizer(reader);
+        scan.ordinaryChar('.'); // assumed number by default
+        scan.commentChar('%'); // % comments will be ignored
+        scan.quoteChar('"');
+        scan.quoteChar('\'');
+        return scan;
+    }
+
     /* Parses a Datalog statement.
      * A statement can be:
-     * - a fact, like parent(alice, bob).
-     * - a rule, like ancestor(A, B) :- ancestor(A, C), parent(C, B).
-     * - a query, like ancestor(X, bob)?
+     * - a fact, e.g., parent(alice, bob).
+     * - a rule, e.g., ancestor(A, B) :- ancestor(A, C), parent(C, B).
+     * - a query, e.g., ancestor(X, bob)?
      */
     public static etbDLStatement parseStmt(StreamTokenizer scan, String repoDirPath) throws DatalogException {
         try {
             Expr head = parseExpr(scan, repoDirPath);
-    
-            if(scan.nextToken() == ':') {// dealing with a rule
+            if(scan.nextToken() == ':') {
+                //parsing a RULE (whose HEAD already parsed)
                 if(scan.nextToken() != '-') {
                     throw new DatalogException("[line " + scan.lineno() + "] expected ':-'");
                 }
                 List<Expr> body = new ArrayList<>();
-                do { //parses each expression (pred or builtin) of the body of the rule
+                do {
+                    //parsing each PREDICATE (uninterpreted or interpreted) in the BODY
                     Expr arg = parseExpr(scan, repoDirPath);
                     body.add(arg);
-                } while(scan.nextToken() == ','); // body preds must be separated by comma
+                } while(scan.nextToken() == ',');
+                // BODY preds must be separated by comma
                 
-                if(scan.ttype != '.') { //rule must end with a dot
+                if(scan.ttype != '.') { //RULE must end with a dot
                     throw new DatalogException("[line " + scan.lineno() + "] expected '.' after rule");
                 }
                 Rule newRule = new Rule(head, body);
-                //System.out.println("head ********** : " + head.toString());
-                //System.out.println("body ********** : " + body.toString());
-                return etbDLStatementFactory.getRuleStatement(newRule); //inserting to the DB
+                //constructing a DL statement of type RULE (using statementFactory utility)
+                return etbDLStatementFactory.getRuleStatement(newRule);
             }
             else {
-                if(scan.ttype == '.') {//fact
-                    return etbDLStatementFactory.getFactStatement(head); //inserting to the DB
+                if(scan.ttype == '.') {//parsing FACT
+                    //constructing a DL statement of type FACT
+                    return etbDLStatementFactory.getFactStatement(head);
                 }
-                else if (scan.ttype == '?') {//query
-                    return etbDLStatementFactory.getQueryStatement(head);//inserting to the DB
+                else if (scan.ttype == '?') {//parsing QUERY
+                    //constructing a DL statement of type QUERY
+                    return etbDLStatementFactory.getQueryStatement(head);
                 }
                 else {
                     throw new DatalogException("[line " + scan.lineno() + "] unexpected symbol of type '" + scan.ttype + "' found");
@@ -59,14 +98,14 @@ public class etbDLParser {
             throw new DatalogException(e);
         }
     }
-    
-    // parses an expression
+    //parses a PREDICATE (uninterpreted or interpreted)
     public static Expr parseExpr(StreamTokenizer scan, String repoDirPath) throws DatalogException, IOException {
         boolean negated = false, builtInExpected = false;
         String lhs = null;
         
         scan.nextToken();
-        if(scan.ttype == StreamTokenizer.TT_WORD && scan.sval.equalsIgnoreCase("not")) { //a negated expression
+        if(scan.ttype == StreamTokenizer.TT_WORD && scan.sval.equalsIgnoreCase("not")) {
+            //a negated PREDICATE
             negated = true;
             scan.nextToken();
         }
@@ -87,7 +126,8 @@ public class etbDLParser {
         }
         
         scan.nextToken(); //TB: moving forward to get the operator and rhs of the expression)
-        if(scan.ttype == StreamTokenizer.TT_WORD || scan.ttype == '=' || scan.ttype == '!' || scan.ttype == '<' || scan.ttype == '>') {//to take care of built-ins??
+        if(scan.ttype == StreamTokenizer.TT_WORD || scan.ttype == '=' || scan.ttype == '!' || scan.ttype == '<' || scan.ttype == '>') {
+            //to take care of built-ins
             scan.pushBack();
             Expr e = parseBuiltInPredicate(lhs, scan);
             e.negated = negated;
@@ -110,14 +150,7 @@ public class etbDLParser {
             }
         }
         
-        //System.out.println("terms size : " + terms.size());
-        //String signature = terms.remove(terms.size()-2);
-        //String mode = terms.remove(terms.size()-1);
-        //System.out.println("signature : " + signature);
-        //System.out.println("mode : " + mode);
-
         Expr e = new Expr(lhs, terms, terms.remove(terms.size()-2), terms.remove(terms.size()-1));
-        //Expr e = new Expr(lhs, terms);
         e.negated = negated;
         return e;
     }
@@ -127,7 +160,8 @@ public class etbDLParser {
         List<String> terms = new ArrayList<>();
         String signature = "", mode = "";
         do {
-            if(scan.nextToken() == StreamTokenizer.TT_WORD) {//etb string type
+            if(scan.nextToken() == StreamTokenizer.TT_WORD) {
+                //checking string type
                 String wordTerm = readComplexTerm(scan.sval, scan);
                 terms.add(wordTerm);
                 signature += "1";
@@ -139,7 +173,8 @@ public class etbDLParser {
             else if(scan.ttype == '"' || scan.ttype == '\'') {
                 //TODO: separate handling of single and double quotes
                 String restScan = scan.sval;
-                if (restScan.contains("/") || restScan.contains(".")) {//may be file?
+                if (restScan.contains("/") || restScan.contains(".")) {
+                    //checking file type
                     String filePath;
                     if ((filePath = utils.getFilePathInDirectory(restScan, repoDirPath)).equals(null)) {
                         throw new DatalogException("[line " + scan.lineno() + "] a non-valid file path " + restScan + "']'");
@@ -149,33 +184,17 @@ public class etbDLParser {
                         signature += "2";
                         mode += "+";
                     }
-                    
-                    /*
-                    File file = new File(restScan);
-                    if (file.exists()) {//TODO: a file variable with no / and .??
-                        terms.add("file(" + file.getAbsolutePath() + ")");
-                        signature += "2";
-                        mode += "+";
-                    }
-                    else {//normal variable
-                        throw new DatalogException("[line " + scan.lineno() + "] a non-valid file path " + restScan + "']'");
-                    }
-                     */
-                    /*
-                    terms.add("file(" + restScan + ")");
-                    signature += "2";
-                    mode += "+";
-*/
                 }
                 else {
                     File file = new File(restScan);
-                    if (file.exists()) {//TODO: a file variable with no / and .??
-                        terms.add("file(" + restScan + ")");
+                    if (file.exists()) {
+                        //TODO: a file variable with no / and .??
+                        terms.add("file(" + restScan + ")"); //TODO: get full path
                         signature += "2";
                         mode += "+";
                     }
                     else {//normal variable
-                        //System.out.println("a valid non-file string");//TODO: does this really happen?
+                        //TODO: does this really happen?
                         signature += "1";
                         if (Character.isUpperCase(restScan.charAt(0)))
                             mode += "-";
@@ -191,17 +210,12 @@ public class etbDLParser {
                 mode += "+";
             }
             else if(scan.ttype == '[') {// a list
-                
                 List<String> listTerms = getPredicateTerms(scan, repoDirPath);
                 if(scan.ttype != ']') {
                     throw new DatalogException("[line " + scan.lineno() + "] list is expected to end with ']'");
                 }
-                
-                //System.out.println("terms size : " + listTerms.size());
                 String signature2 = listTerms.remove(listTerms.size()-2);
                 String mode2 = listTerms.remove(listTerms.size()-1);
-                //System.out.println("signature2 : " + signature2);
-                //System.out.println("mode2 : " + mode2);
                 //TODO: efficient/better logic
                 mode += "+";
                 if (listTerms.get(0).contains("file(")) {
@@ -210,7 +224,6 @@ public class etbDLParser {
                 else {
                     signature += "3";
                 }
-                
                 Iterator<String> iterator = listTerms.iterator();
                 String listStr = "listIdent";
                 while (iterator.hasNext()) {
@@ -227,7 +240,7 @@ public class etbDLParser {
         return terms;
     }
     
-    //makes sure complex terms with underscore, e.g., 'inv_1_main', are parsed
+    //parses complex terms with underscore, e.g., 'inv_1_main'
     private static String readComplexTerm(String initTerm, StreamTokenizer scan) throws DatalogException, IOException {
         String compTerm = initTerm;
         if(scan.nextToken() == '_') {
@@ -258,9 +271,11 @@ public class etbDLParser {
         } else {// <, >, =, !
             operator = Character.toString((char)scan.ttype);
             scan.nextToken();
-            if(scan.ttype == '=' || scan.ttype == '>') {//TB: != or <>
-                operator = operator + Character.toString((char)scan.ttype);
-            } else { // TB: the rest of single char operators
+            if(scan.ttype == '=' || scan.ttype == '>') {
+                // operator is != or <>
+                operator += Character.toString((char)scan.ttype);
+            } else {
+                // operator is is of single char, e.g., < or >
                 scan.pushBack();
             }
         }
@@ -269,7 +284,8 @@ public class etbDLParser {
             throw new DatalogException("invalid operator '" + operator + "'");
         }
         
-        scan.nextToken(); //move on to the rhs of the expression
+        //move on to the rhs of the expression
+        scan.nextToken();
         String rhs = null;
         if(scan.ttype == StreamTokenizer.TT_WORD) {
             rhs = scan.sval;
@@ -293,10 +309,4 @@ public class etbDLParser {
             return String.format("%s",nval);
     }
     
-    private static final Pattern numberPattern = Pattern.compile("[+-]?\\d+(\\.\\d*)?([Ee][+-]?\\d+)?");
-    
-    /* Checks, via regex, if a String can be parsed as a Double */
-    public static boolean tryParseDouble(String str) {
-        return numberPattern.matcher(str).matches();
-    }
 }
